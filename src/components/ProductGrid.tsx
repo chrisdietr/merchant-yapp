@@ -1,6 +1,6 @@
 
 import { useEffect, useState } from "react"
-import { Product, ShopData } from "@/lib/types"
+import { Product } from "@/lib/types"
 import { ProductCard } from "@/components/ProductCard"
 import { Skeleton } from "@/components/ui/skeleton"
 
@@ -18,8 +18,9 @@ export function ProductGrid() {
           throw new Error("Failed to fetch products")
         }
         
-        const data: ShopData = await response.json()
-        setProducts(data.products)
+        const data = await response.json()
+        // Access the products array directly from the response
+        setProducts(data.products || [])
         setIsLoading(false)
       } catch (err) {
         setError("Error loading products. Please try again later.")

@@ -1,46 +1,61 @@
+
 {
-  "shops": [
+  "products": [
     {
       "id": "1",
-      "name": "Ale City Merch",
-      "wallet_address": "0x1234567890123456789012345678901234567890",
-      "telegram_handle": "yodl_tam",
-      "description": "Pour decisions, great company.",
-      "logo_url": "https://example.com/logo.png",
-      "created_at": "2024-01-01T00:00:00Z",
-      "updated_at": "2024-01-01T00:00:00Z",
-      "products": [
-        {
-          "id": "1",
-          "name": "Shirt",
-          "emoji": "👕",
-          "price": 0.10,
-          "currency": "BRL",
-          "description": "Comfortable Ale City Merch shirt",
-          "image_url": "https://example.com/shirt.png",
-          "stock": 100
-        },
-        {
-          "id": "2",
-          "name": "Cap",
-          "emoji": "🧢",
-          "price": 0.05,
-          "currency": "BRL",
-          "description": "Stylish Ale City Merch cap",
-          "image_url": "https://example.com/cap.png",
-          "stock": 50
-        },
-        {
-          "id": "3",
-          "name": "Beer",
-          "emoji": "🍺",
-          "price": 0.20,
-          "currency": "BRL",
-          "description": "Refreshing Ale City beer",
-          "image_url": "https://example.com/beer.png",
-          "stock": 200
-        }
-      ]
+      "name": "Premium Leather Wallet",
+      "price": 49.99,
+      "description": "Genuine leather wallet with multiple card slots and a coin pocket.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "2",
+      "name": "Wireless Earbuds",
+      "price": 129.99,
+      "description": "High-quality wireless earbuds with noise cancellation.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "3",
+      "name": "Minimalist Watch",
+      "price": 89.99,
+      "description": "Elegant minimalist watch with a leather strap.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "4",
+      "name": "Smart Water Bottle",
+      "price": 34.99,
+      "description": "Tracks your water intake and reminds you to stay hydrated.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "5",
+      "name": "Portable Charger",
+      "price": 49.99,
+      "description": "10,000mAh portable charger with fast charging capability.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "6",
+      "name": "Premium Coffee Mug",
+      "price": 24.99,
+      "description": "Double-walled insulated coffee mug that keeps your drink hot for hours.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "7",
+      "name": "Bluetooth Speaker",
+      "price": 79.99,
+      "description": "Waterproof Bluetooth speaker with 12-hour battery life.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "8",
+      "name": "Yoga Mat",
+      "price": 39.99,
+      "description": "Non-slip yoga mat with carrying strap.",
+      "image": "/placeholder.svg"
     }
   ]
-} 
+}
