@@ -1,0 +1,61 @@
+
+{
+  "products": [
+    {
+      "id": "1",
+      "name": "Premium Leather Wallet",
+      "price": 49.99,
+      "description": "Genuine leather wallet with multiple card slots and a coin pocket.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "2",
+      "name": "Wireless Earbuds",
+      "price": 129.99,
+      "description": "High-quality wireless earbuds with noise cancellation.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "3",
+      "name": "Minimalist Watch",
+      "price": 89.99,
+      "description": "Elegant minimalist watch with a leather strap.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "4",
+      "name": "Smart Water Bottle",
+      "price": 34.99,
+      "description": "Tracks your water intake and reminds you to stay hydrated.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "5",
+      "name": "Portable Charger",
+      "price": 49.99,
+      "description": "10,000mAh portable charger with fast charging capability.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "6",
+      "name": "Premium Coffee Mug",
+      "price": 24.99,
+      "description": "Double-walled insulated coffee mug that keeps your drink hot for hours.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "7",
+      "name": "Bluetooth Speaker",
+      "price": 79.99,
+      "description": "Waterproof Bluetooth speaker with 12-hour battery life.",
+      "image": "/placeholder.svg"
+    },
+    {
+      "id": "8",
+      "name": "Yoga Mat",
+      "price": 39.99,
+      "description": "Non-slip yoga mat with carrying strap.",
+      "image": "/placeholder.svg"
+    }
+  ]
+}

@@ -1,13 +1,20 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+
+import { Layout } from "@/components/Layout"
+import { ProductGrid } from "@/components/ProductGrid"
 
 const Index = () => {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">Welcome to Your Blank App</h1>
-        <p className="text-xl text-gray-600">Start building your amazing project here!</p>
+    <Layout>
+      <div className="space-y-8">
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl font-bold">Featured Products</h2>
+          <p className="text-muted-foreground max-w-lg mx-auto">
+            Discover our curated selection of premium products for every need.
+          </p>
+        </div>
+        <ProductGrid />
       </div>
-    </div>
+    </Layout>
   );
 };
 
