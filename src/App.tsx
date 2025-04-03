@@ -10,6 +10,7 @@ import YodlPaymentPage from "@/pages/YodlPaymentPage";
 import ConfirmationPage from "@/pages/ConfirmationPage";
 import ProductPage from "@/pages/ProductPage";
 import AdminScannerPage from "@/pages/AdminScannerPage";
+import VerifyPage from "@/pages/VerifyPage";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import { Toaster } from "@/components/ui/toaster";
@@ -33,6 +34,7 @@ export default function App() {
                     <Route path="/payment" element={<Payment />} />
                     <Route path="/yodl" element={<YodlPaymentPage />} />
                     <Route path="/confirmation/:orderId" element={<ConfirmationPage />} />
+                    <Route path="/verify/:orderId/:txHash?" element={<VerifyPage />} />
                     <Route path="/product" element={<ProductPage />} />
                     <Route 
                       path="/admin/scanner" 

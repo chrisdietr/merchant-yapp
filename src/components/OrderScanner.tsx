@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { WALLET_ADDRESS } from '../config/yodl';
 import { useAuth } from '@/contexts/AuthContext';
+import yodlService from '../lib/yodl';
 
 // Define the parsed QR data structure
 interface OrderData {
@@ -15,6 +16,7 @@ interface OrderData {
   status: string;
   txHash?: string;
   nonce?: string;
+  productName?: string;
 }
 
 interface OrderScannerProps {
@@ -45,7 +47,63 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
   const handleScan = (data: { text: string } | null) => {
     if (data && data.text) {
       try {
-        // Parse QR code data
+        // First check if the QR code is a URL (from confirmation page)
+        if (data.text.startsWith('http')) {
+          console.log('URL detected in QR code:', data.text);
+          
+          // Parse the URL to extract order information
+          const url = new URL(data.text);
+          const pathParts = url.pathname.split('/');
+          
+          // Check if it's a verify URL with format: /verify/{orderId}/{txHash}
+          if (pathParts.length >= 3 && pathParts[1] === 'verify') {
+            const orderId = pathParts[2];
+            const txHash = pathParts.length >= 4 ? pathParts[3] : undefined;
+            
+            console.log('Extracted from URL - orderId:', orderId, 'txHash:', txHash);
+            
+            // Get stored order data if available
+            const orderInfo = yodlService.getOrderInfo(orderId);
+            
+            if (orderInfo) {
+              setScannedData({
+                orderId,
+                status: orderInfo.status || 'pending',
+                amount: orderInfo.amount,
+                currency: orderInfo.currency,
+                txHash: txHash || orderInfo.txHash,
+                timestamp: orderInfo.timestamp || new Date().toISOString(),
+                productName: orderInfo.productName,
+                nonce: orderInfo.nonce
+              });
+              setScanning(false);
+              setError(null);
+              return;
+            } else if (txHash) {
+              // If we have a txHash but no stored data, fetch from API asynchronously
+              setScannedData({
+                orderId,
+                status: 'pending', // Will be updated after API response
+                amount: 0,
+                currency: 'UNKNOWN',
+                txHash,
+                timestamp: new Date().toISOString()
+              });
+              
+              // Start API fetch in background
+              fetchTransactionDetails(txHash, orderId);
+              
+              setScanning(false);
+              setError(null);
+              return;
+            } else {
+              setError('Order information not found for this QR code');
+              return;
+            }
+          }
+        }
+        
+        // If not a URL, try to parse as JSON
         const parsedData = JSON.parse(data.text) as OrderData;
         
         // Validate that the scanned data is indeed an order
@@ -60,6 +118,33 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
         setError('Failed to parse QR code. Please try again.');
         console.error('QR Scan Error:', err);
       }
+    }
+  };
+
+  // Function to fetch transaction details from API
+  const fetchTransactionDetails = async (txHash: string, orderId: string) => {
+    try {
+      const paymentDetails = await yodlService.fetchPaymentDetails(txHash);
+      
+      if (paymentDetails) {
+        const updatedData = {
+          orderId,
+          status: 'completed' as const,
+          amount: parseFloat(paymentDetails.amount || paymentDetails.tokenOutAmount || paymentDetails.invoiceAmount || '0'),
+          currency: paymentDetails.currency || paymentDetails.tokenOutSymbol || paymentDetails.invoiceCurrency || 'UNKNOWN',
+          txHash,
+          timestamp: paymentDetails.timestamp || paymentDetails.blockTimestamp || paymentDetails.created || new Date().toISOString(),
+        };
+        
+        // Update scanned data with API data
+        setScannedData(updatedData);
+        
+        // Store this info for future reference
+        yodlService.storeOrderInfo(orderId, updatedData);
+      }
+    } catch (apiError) {
+      console.error('Error fetching payment details:', apiError);
+      // Don't update UI with error since we already have partial data showing
     }
   };
 
