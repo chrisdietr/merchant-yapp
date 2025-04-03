@@ -1,8 +1,8 @@
-
 import { useEffect, useState } from "react"
 import { Product } from "@/lib/types"
 import { ProductCard } from "@/components/ProductCard"
 import { Skeleton } from "@/components/ui/skeleton"
+import shopsData from "@/config/shops.json"
 
 export function ProductGrid() {
   const [products, setProducts] = useState<Product[]>([])
@@ -10,26 +10,15 @@ export function ProductGrid() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const response = await fetch("/shops.json")
-        
-        if (!response.ok) {
-          throw new Error("Failed to fetch products")
-        }
-        
-        const data = await response.json()
-        // Access the products array directly from the response
-        setProducts(data.products || [])
-        setIsLoading(false)
-      } catch (err) {
-        setError("Error loading products. Please try again later.")
-        setIsLoading(false)
-        console.error("Error fetching products:", err)
-      }
+    try {
+      // Use the imported data instead of fetching
+      setProducts(shopsData.products || [])
+      setIsLoading(false)
+    } catch (err) {
+      setError("Error loading products. Please try again later.")
+      setIsLoading(false)
+      console.error("Error loading products:", err)
     }
-
-    fetchProducts()
   }, [])
 
   if (error) {

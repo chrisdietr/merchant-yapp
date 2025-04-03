@@ -1,69 +1,70 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
+    /* Light mode - white background theme */
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --foreground: 270 50% 30%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card: 270 40% 50%;
+    --card-foreground: 0 0% 100%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
+    --popover-foreground: 270 50% 30%;
 
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 276 100% 65%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary: 280 70% 55%;
+    --secondary-foreground: 0 0% 100%;
 
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 270 20% 90%;
+    --muted-foreground: 270 40% 40%;
 
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 290 80% 65%;
+    --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 90% 65%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --border: 270 30% 80%;
+    --input: 270 30% 80%;
+    --ring: 276 60% 60%;
 
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
+    /* Dark mode - deeper purple theme */
+    --background: 270 50% 10%;
     --foreground: 0 0% 98%;
 
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
+    --card: 270 50% 15%;
+    --card-foreground: 0 0% 90%;
 
-    --popover: 240 10% 3.9%;
+    --popover: 270 50% 10%;
     --popover-foreground: 0 0% 98%;
 
-    --primary: 0 0% 98%;
-    --primary-foreground: 240 5.9% 10%;
+    --primary: 270 90% 55%;
+    --primary-foreground: 0 0% 98%;
 
-    --secondary: 240 3.7% 15.9%;
+    --secondary: 270 40% 25%;
     --secondary-foreground: 0 0% 98%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --muted: 270 40% 20%;
+    --muted-foreground: 240 5% 74.9%;
 
-    --accent: 240 3.7% 15.9%;
+    --accent: 270 40% 40%;
     --accent-foreground: 0 0% 98%;
 
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
+    --border: 270 40% 30%;
+    --input: 270 40% 30%;
+    --ring: 270 60% 60%;
   }
 }
 
@@ -72,12 +73,80 @@
     @apply border-border;
   }
   
-  body {
-    @apply bg-background text-foreground transition-colors duration-300;
+  html, body {
+    @apply antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Improve text rendering on mobile */
+  @media (max-width: 768px) {
+    html, body {
+      text-rendering: optimizeSpeed;
+      -webkit-font-smoothing: antialiased;
+    }
+  }
+  
+  /* Hide scrollbar for mobile but keep functionality */
+  @media (max-width: 768px) {
+    ::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+      background: transparent;
+    }
+  }
+  
+  body.light {
+    background: white;
+    @apply text-foreground transition-colors duration-300;
     font-feature-settings: "rlig" 1, "calt" 1;
+    min-height: 100vh;
+  }
+
+  body.dark {
+    @apply bg-gradient-to-br from-[#1a1033] via-[#25104a] to-[#1a1033] text-foreground transition-colors duration-300;
+    font-feature-settings: "rlig" 1, "calt" 1;
+    min-height: 100vh;
   }
 
   .product-card {
     @apply transition-all duration-300 hover:scale-[1.02];
   }
+  
+  /* Touch-friendly animations only on non-touch devices */
+  @media (hover: hover) {
+    .gradient-button {
+      @apply bg-gradient-to-r from-purple-700 via-fuchsia-600 to-indigo-700 hover:from-purple-800 hover:via-fuchsia-700 hover:to-indigo-800 transition-all duration-300;
+    }
+  }
+  
+  /* Simplified animations for touch devices */
+  @media (hover: none) {
+    .gradient-button {
+      @apply bg-gradient-to-r from-purple-700 via-fuchsia-600 to-indigo-700 active:from-purple-800 active:via-fuchsia-700 active:to-indigo-800 transition-colors;
+    }
+  }
+  
+  /* Add smooth-scrolling for the entire app */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Improve button and input accessibility on touch devices */
+  @media (max-width: 768px) {
+    button, a, [role="button"], input, select, textarea {
+      @apply min-h-[44px] touch-manipulation;
+    }
+  }
+}
+
+/* Custom gradient background for cards */
+.light .gradient-card {
+  @apply bg-gradient-to-br from-[#7a39e0]/90 to-[#9d45ff]/90 backdrop-blur-sm;
+  box-shadow: 0 8px 25px rgba(126, 87, 220, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.dark .gradient-card {
+  @apply bg-gradient-to-br from-[#211040]/90 to-[#38135e]/90 backdrop-blur-sm;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
 }

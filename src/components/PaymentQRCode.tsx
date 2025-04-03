@@ -1,10 +1,10 @@
-
 import { useEffect, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Product } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
+import shopsData from "@/config/shops.json"
 
 interface PaymentQRCodeProps {
   productId: string
@@ -27,16 +27,9 @@ export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
     : ""
 
   useEffect(() => {
-    async function fetchProduct() {
+    function fetchProduct() {
       try {
-        const response = await fetch("/shops.json")
-        
-        if (!response.ok) {
-          throw new Error("Failed to fetch product data")
-        }
-        
-        const data = await response.json()
-        const foundProduct = data.products.find((p: Product) => p.id === productId)
+        const foundProduct = shopsData.products.find((p: Product) => p.id === productId)
         
         if (!foundProduct) {
           throw new Error("Product not found")
