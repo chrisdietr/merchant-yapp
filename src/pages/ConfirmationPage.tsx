@@ -456,16 +456,18 @@ const ConfirmationPage: React.FC = () => {
           </div>
           
           <div className="flex flex-col space-y-3">
-            {/* Always show Telegram contact button with fallback if needed */}
-            <a 
-              href={generateTelegramLink(shopInfo?.telegramHandle || 'YodlSupport', getTelegramMessage())}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full"
-            >
-              <img src="https://i.ibb.co/G3Tsy0m3/Telegram-logo-svg.webp" alt="Telegram" className="h-5 w-5 mr-2" />
-              Contact Seller on Telegram
-            </a>
+            {/* Only show Telegram contact button if handle exists */}
+            {shopInfo?.telegramHandle && (
+              <a 
+                href={generateTelegramLink(shopInfo.telegramHandle, getTelegramMessage())}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full"
+              >
+                <img src="https://i.ibb.co/G3Tsy0m3/Telegram-logo-svg.webp" alt="Telegram" className="h-5 w-5 mr-2" />
+                Contact Seller on Telegram
+              </a>
+            )}
             
             <Button onClick={saveConfirmation} className="w-full">
               Save Confirmation to Gallery

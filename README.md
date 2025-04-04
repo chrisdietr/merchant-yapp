@@ -13,7 +13,9 @@ A decentralized point-of-sale application with crypto payments built with React,
 - **Fully Responsive Design**: Optimized for mobile, tablet, and desktop devices
 - **Mobile-Friendly UI**: Hamburger menu, touch-optimized buttons, and smooth interactions
 - **Order Confirmations**: Clean, shareable receipts with product details and QR codes
-- **Telegram Integration**: Direct customer communication with product information
+- **QR Code Verification**: Enhanced scanning capabilities for both URL and JSON QR codes
+- **Verification Page**: Customer-facing verification page showing payment status and details
+- **Telegram Integration**: Optional direct customer communication with product information
 - **Inventory Management**: Support for in-stock, out-of-stock, and unlimited inventory
 - **Security**: Admin privileges locked to specific wallet addresses
 
@@ -86,6 +88,7 @@ yarn dev
 ```
 
 > ℹ️ **Note**: The `ownerAddress` in your shop configuration is automatically used for all products. You don't need to specify an owner for each product.
+> ℹ️ **Note**: The `telegramHandle` is optional. If left empty, the "Contact Seller on Telegram" button will not be displayed.
 
 ### Step 3: Add Products
 
@@ -159,6 +162,13 @@ The Admin QR Scanner allows you to verify customer orders by scanning QR codes. 
 2. Click the "Admin Scanner" link in the navigation
 3. Use the scanner to verify payment details from customer QR codes
 
+The enhanced scanner now supports:
+- Scanning URL-based QR codes from verification pages
+- Scanning JSON-based QR codes with product and payment details
+- Display of product emoji and description
+- Display of buyer wallet address
+- Transaction verification with links to block explorer
+
 ## 🛒 Customer Experience
 
 ### Mobile-Friendly Shopping
@@ -176,7 +186,16 @@ After a successful purchase, customers will receive a confirmation page that inc
 - QR code for order verification
 - Transaction details with full transaction hash
 - Option to save the confirmation to their device's gallery
-- Direct "Contact Seller on Telegram" button with pre-filled message
+- Direct "Contact Seller on Telegram" button (if telegramHandle is configured)
+
+### Order Verification
+
+The application now includes a dedicated verification page accessed by scanning the QR code:
+- Shows product details including emoji and description
+- Displays payment status (pending or confirmed)
+- Shows transaction details with links to block explorer
+- Includes buyer's wallet address for verification
+- Links to shop information and contact details
 
 ## 🎨 Customization
 
@@ -226,13 +245,14 @@ This application integrates with Yodl payment system. To configure your payment 
 1. Set your wallet address in the `ownerAddress` field of your shop in shops.json
 2. Ensure your wallet is properly set up to receive the specified currencies
 
-### Telegram Integration
+### Telegram Integration (Optional)
 
-The application provides a direct way for customers to contact sellers:
+The application provides an optional way for customers to contact sellers:
 
-1. Set your Telegram handle in the `shops.json` file
+1. Set your Telegram handle in the `telegramHandle` field in shops.json
 2. When customers complete a purchase, they can click the "Contact Seller on Telegram" button
 3. This opens Telegram with a pre-filled message including product name and transaction details
+4. If you leave the telegramHandle empty, the button will not be displayed
 
 ## 📱 Deployment
 
