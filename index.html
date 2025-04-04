@@ -11,6 +11,7 @@
     <meta property="og:title" content="Merchant Yapp Shop" id="og-title" />
     <meta property="og:description" content="A modern merchant shop with direct purchase functionality" id="og-description" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="" id="og-url" />
     <meta property="og:image" id="og-image" content="" />
 
     <meta name="twitter:card" content="summary_large_image" />
@@ -22,14 +23,19 @@
     <!-- Meta tag update script -->
     <script>
       // This script dynamically updates meta tags for social media preview
-      document.addEventListener('DOMContentLoaded', function() {
+      function updateMetaTags() {
         // Check if we're on a confirmation page
         if (window.location.pathname.includes('/confirmation/')) {
+          console.log('Detected confirmation page - updating meta tags');
+          
           // Extract order ID and amount
           const pathParts = window.location.pathname.split('/');
           const orderId = pathParts[pathParts.length - 1];
           const urlParams = new URLSearchParams(window.location.search);
           const amount = urlParams.get('amount');
+          
+          console.log('Order ID:', orderId);
+          console.log('Amount:', amount);
           
           // Generate dynamic title and description
           let productName = "Product";
@@ -52,9 +58,14 @@
           const title = `${productName} Order - Payment Complete`;
           const description = `Order confirmation for ${productName}${amount ? ' - ' + amount : ''}. Thank you for your purchase!`;
           
-          // Generate social preview URL (absolute URL to the social preview page)
+          // Generate absolute URLs
           const baseUrl = window.location.origin;
+          const currentPageUrl = window.location.href;
           const socialPreviewUrl = `${baseUrl}/social-preview/${orderId}`;
+          
+          console.log('Title:', title);
+          console.log('Description:', description);
+          console.log('Social preview URL:', socialPreviewUrl);
           
           // Update all meta tags
           document.title = title;
@@ -63,14 +74,24 @@
           // Open Graph
           document.getElementById('og-title').setAttribute('content', title);
           document.getElementById('og-description').setAttribute('content', description);
+          document.getElementById('og-url').setAttribute('content', currentPageUrl);
           document.getElementById('og-image').setAttribute('content', socialPreviewUrl);
           
           // Twitter
           document.getElementById('twitter-title').setAttribute('content', title);
           document.getElementById('twitter-description').setAttribute('content', description);
           document.getElementById('twitter-image').setAttribute('content', socialPreviewUrl);
+          
+          console.log('Meta tags updated successfully');
         }
-      });
+      }
+      
+      // Run immediately and also when the DOM is fully loaded
+      updateMetaTags();
+      document.addEventListener('DOMContentLoaded', updateMetaTags);
+      
+      // Also run when URL changes (for SPA behavior)
+      window.addEventListener('popstate', updateMetaTags);
     </script>
   </head>
 
