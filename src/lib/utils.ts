@@ -10,7 +10,7 @@ interface Shop {
   ownerAddress: string;
   name: string;
   telegramHandle: string;
-  contactInfo: {
+  contactInfo?: {
     email: string;
     phone: string;
   };
