@@ -271,8 +271,6 @@ const ConfirmationPage: React.FC = () => {
     if (!previewCardRef.current) return;
     
     try {
-      // No longer setting isCapturing to true to prevent showing full hash
-      
       // Temporarily make the card visible for capturing
       const previewCard = previewCardRef.current;
       const originalStyles = {
@@ -309,8 +307,6 @@ const ConfirmationPage: React.FC = () => {
       previewCard.style.left = originalStyles.left;
       previewCard.style.opacity = originalStyles.opacity;
       
-      // No need to reset isCapturing since we didn't set it
-      
       // Create an anchor element to download the image
       const link = document.createElement('a');
       link.href = canvas.toDataURL('image/png');
@@ -323,6 +319,19 @@ const ConfirmationPage: React.FC = () => {
       console.error('Error saving confirmation:', error);
       alert('Failed to save confirmation');
     }
+  };
+
+  // Function to copy social share link
+  const copySocialShareLink = () => {
+    const shareLink = `https://merchant-yapp.lovable.app/verify/${order.orderId}${order.txHash ? `/${order.txHash}` : ''}`;
+    navigator.clipboard.writeText(shareLink)
+      .then(() => {
+        alert('Link copied to clipboard!');
+      })
+      .catch(err => {
+        console.error('Failed to copy link: ', err);
+        alert('Failed to copy link. Please try again.');
+      });
   };
 
   // Get the order QR code value - includes transaction hash if available
@@ -363,7 +372,7 @@ const ConfirmationPage: React.FC = () => {
     
     const orderLink = getOrderQRValue(); // Use the order verification link instead of txn URL
     
-    return `Hey, I just bought a ${productName} from ${shopName}. Where can I pick it up from? Order confirmation: ${orderLink}`;
+    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from? Order confirmation: ${orderLink}`;
   };
 
   // Find product emoji from productId in the orderId
@@ -567,31 +576,38 @@ const ConfirmationPage: React.FC = () => {
             </div>
           </div>
           
-          {/* Preview card for saving to gallery - simplified, cleaner version */}
+          {/* Preview card for saving to gallery - sleeker version */}
           <div 
             ref={previewCardRef} 
-            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4"
-            style={{ position: 'absolute', left: '-9999px', opacity: '0', width: '350px', height: 'auto' }}
+            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-3"
+            style={{ position: 'absolute', left: '-9999px', opacity: '0', width: '320px', height: 'auto' }}
           >
-            <div className="flex items-start gap-4">
-              <div className="bg-white p-2 rounded-md">
+            <div className="flex items-start gap-3">
+              <div className="bg-white p-1.5 rounded-md">
                 <QRCode 
                   value={getOrderQRValue()} 
-                  size={80}
+                  size={50}
                   renderAs="canvas"
                   includeMargin={false}
                 />
               </div>
               <div className="flex-1 text-white">
-                <div className="flex items-center mb-2">
-                  <span className="text-2xl mr-2">{getProductEmoji()}</span>
-                  <span className="font-medium">{getProductName()}</span>
+                <div className="flex items-center">
+                  <span className="text-xl mr-1.5">{getProductEmoji()}</span>
+                  <span className="font-small text-sm">{getProductName()}</span>
                 </div>
-                <div className="text-sm space-y-1">
-                  <p className="text-green-300 font-medium">{order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}</p>
-                  <p className="text-lg font-bold">{formatCurrency(order.amount, order.currency)}</p>
-                  <p className="text-gray-300 text-xs">{new Date(order.timestamp || Date.now()).toLocaleString()}</p>
-                </div>
+                
+                <p className="text-green-300 font-medium text-xs mt-1.5">
+                  {order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}
+                </p>
+                
+                <p className="text-base font-bold my-0.5">
+                  {formatCurrency(order.amount, order.currency)}
+                </p>
+                
+                <p className="text-gray-300 text-[10px]">
+                  {new Date(order.timestamp || Date.now()).toLocaleString()}
+                </p>
               </div>
             </div>
           </div>
@@ -620,9 +636,15 @@ const ConfirmationPage: React.FC = () => {
               return null;
             })()}
             
-            <Button onClick={saveConfirmation} className="w-full">
-              Save Confirmation to Gallery
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={saveConfirmation} className="flex-1">
+                Save to Gallery
+              </Button>
+              
+              <Button onClick={copySocialShareLink} variant="secondary" className="flex-1">
+                Copy Share Link
+              </Button>
+            </div>
             
             <Link to="/">
               <Button variant="outline" className="w-full">
