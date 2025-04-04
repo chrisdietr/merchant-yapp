@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import yodlService from '../lib/yodl';
 import { formatCurrency } from '../utils/currency';
 import { getShopByOwnerAddress } from '@/lib/utils';
+import shopsData from "@/config/shops.json";
 
 interface OrderDetails {
   orderId: string;
@@ -15,6 +16,18 @@ interface OrderDetails {
   timestamp?: string;
   productName?: string;
   ownerAddress?: string;
+  senderAddress?: string;
+  productId?: string;
+}
+
+interface Product {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  emoji: string;
+  inStock: boolean | string;
 }
 
 const VerifyPage: React.FC = () => {
@@ -23,6 +36,7 @@ const VerifyPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [shopInfo, setShopInfo] = useState<any>(null);
+  const [product, setProduct] = useState<Product | null>(null);
 
   useEffect(() => {
     const loadOrderData = async () => {
@@ -49,6 +63,16 @@ const VerifyPage: React.FC = () => {
             const shop = getShopByOwnerAddress(storedOrderInfo.ownerAddress);
             setShopInfo(shop);
           }
+          
+          // Find product details if productId is available
+          if (storedOrderInfo.productId) {
+            const productDetails = shopsData.products.find(
+              (p: Product) => p.id === storedOrderInfo.productId
+            );
+            if (productDetails) {
+              setProduct(productDetails);
+            }
+          }
         } else if (txHash) {
           // If not in localStorage but we have txHash, try to fetch from API
           try {
@@ -62,6 +86,7 @@ const VerifyPage: React.FC = () => {
                 currency: paymentDetails.currency || paymentDetails.tokenOutSymbol || paymentDetails.invoiceCurrency || 'UNKNOWN',
                 status: 'completed' as const,
                 timestamp: paymentDetails.timestamp || paymentDetails.blockTimestamp || paymentDetails.created || new Date().toISOString(),
+                senderAddress: paymentDetails.from || paymentDetails.senderAddress || '',
               };
               
               setOrder(orderData);
@@ -137,12 +162,29 @@ const VerifyPage: React.FC = () => {
               <span className="font-medium text-black dark:text-white">{order.orderId}</span>
             </div>
             
-            {order.productName && (
+            {/* Product Information */}
+            {product ? (
+              <div className="bg-background/50 p-3 rounded-md border mb-3">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-4xl">{product.emoji}</span>
+                  <div>
+                    <h3 className="font-medium text-black dark:text-white">{product.name}</h3>
+                    <p className="text-sm text-muted-foreground">{product.description}</p>
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-black dark:text-foreground/70">Price:</span>
+                  <span className="font-medium text-black dark:text-white">
+                    {formatCurrency(product.price, product.currency)}
+                  </span>
+                </div>
+              </div>
+            ) : order.productName ? (
               <div className="flex justify-between">
                 <span className="text-black dark:text-foreground/70">Product:</span>
                 <span className="font-medium text-black dark:text-white">{order.productName}</span>
               </div>
-            )}
+            ) : null}
             
             {order.txHash && (
               <div className="flex justify-between items-start">
@@ -180,13 +222,38 @@ const VerifyPage: React.FC = () => {
                 </span>
               </div>
             )}
+            
+            {order.senderAddress && (
+              <div className="flex justify-between items-start">
+                <span className="text-black dark:text-foreground/70">Sender:</span>
+                <a
+                  href={`https://yodl.me/address/${order.senderAddress}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-500 hover:underline font-medium text-right break-all max-w-[200px]"
+                >
+                  {order.senderAddress}
+                </a>
+              </div>
+            )}
           </div>
           
           {shopInfo && (
-            <div className="mt-4 text-center">
-              <span className="text-sm text-black dark:text-white">
-                Purchase from <span className="font-semibold">{shopInfo.name}</span>
-              </span>
+            <div className="mt-4 text-center bg-muted/30 p-3 rounded-md">
+              <h3 className="font-semibold text-black dark:text-white mb-1">{shopInfo.name}</h3>
+              {shopInfo.telegramHandle && (
+                <a 
+                  href={`https://t.me/${shopInfo.telegramHandle}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center text-sm text-blue-500 hover:underline gap-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.99 5.363a1.068 1.068 0 0 0-1.058-.794 2.01 2.01 0 0 0-.513.106L2.217 10.148a1.29 1.29 0 0 0-.792.964c-.099.431.18.869.639.967.019 0 .039.01.039.01l4.959 1.467 1.758 5.424a1.28 1.28 0 0 0 1.096.78 1.183 1.183 0 0 0 1.058-.493l2.453-2.76 4.86 3.582c.157.116.337.165.515.165a1.18 1.18 0 0 0 .462-.097c.355-.175.582-.551.582-.946V5.753a.706.706 0 0 0-.099-.39z" />
+                  </svg>
+                  Contact on Telegram
+                </a>
+              )}
             </div>
           )}
         </div>

@@ -1,20 +1,32 @@
 import { useEffect, useState } from "react"
 import { QRCodeSVG } from "qrcode.react"
-import { Product } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft } from "lucide-react"
 import shopsData from "@/config/shops.json"
+import { useAuth } from "@/contexts/AuthContext"
+
+// Define a simplified Product interface matching the shop.json structure
+interface ProductData {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  emoji: string;
+  inStock: boolean | string;
+}
 
 interface PaymentQRCodeProps {
   productId: string
 }
 
 export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
-  const [product, setProduct] = useState<Product | null>(null)
+  const [product, setProduct] = useState<ProductData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const navigate = useNavigate()
+  const { address } = useAuth()
 
   const qrValue = product
     ? JSON.stringify({
@@ -23,13 +35,19 @@ export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
         price: product.price,
         orderId: `ORDER-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
         timestamp: new Date().toISOString(),
+        senderAddress: address || undefined,
+        // Get shop information - we just need the first shop for demo
+        shopInfo: shopsData.shops.length > 0 ? {
+          name: shopsData.shops[0].name,
+          ownerAddress: shopsData.shops[0].ownerAddress
+        } : undefined
       })
     : ""
 
   useEffect(() => {
     function fetchProduct() {
       try {
-        const foundProduct = shopsData.products.find((p: Product) => p.id === productId)
+        const foundProduct = shopsData.products.find((p) => p.id === productId)
         
         if (!foundProduct) {
           throw new Error("Product not found")
@@ -46,6 +64,13 @@ export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
     
     fetchProduct()
   }, [productId])
+
+  // Log the QR code value for debugging
+  useEffect(() => {
+    if (product) {
+      console.log("QR Code value:", qrValue)
+    }
+  }, [product, qrValue])
 
   if (isLoading) {
     return (
