@@ -537,7 +537,16 @@ const ConfirmationPage: React.FC = () => {
   const getSocialPreviewTitle = () => {
     const productName = getProductName();
     const status = order.status === 'completed' ? 'Payment Confirmed' : 'Payment Pending';
-    return `${productName} - ${status}`;
+    let shopName = 'Merchant Shop';
+    
+    if (shopInfo && shopInfo.name) {
+      shopName = shopInfo.name;
+    } else if (shopsData.shops && shopsData.shops.length > 0) {
+      shopName = shopsData.shops[0].name;
+    }
+    
+    // Create a more descriptive title with 30-60 characters
+    return `${productName} | ${status} | Order from ${shopName}`;
   };
 
   // Function to get social media preview description
@@ -552,7 +561,10 @@ const ConfirmationPage: React.FC = () => {
       shopName = shopsData.shops[0].name;
     }
     
-    return `${productName} ordered from ${shopName} for ${amount}. ${order.status === 'completed' ? 'Payment confirmed.' : 'Payment pending.'}`;
+    const date = new Date(order.timestamp || Date.now()).toLocaleString();
+    
+    // More detailed description with order details
+    return `${productName} purchased from ${shopName} for ${amount}. Order ID: ${order.orderId}. ${order.status === 'completed' ? 'Payment confirmed on ' : 'Payment pending as of '} ${date}.`;
   };
 
   return (
@@ -762,10 +774,10 @@ const ConfirmationPage: React.FC = () => {
             </Link>
           </div>
 
-          {/* Hidden element for social media preview image generation */}
+          {/* Hidden element for social media preview image generation - matched to gallery save style but optimized for social */}
           <div 
             ref={socialPreviewRef} 
-            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-6"
+            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-8"
             style={{ 
               position: 'absolute', 
               left: '-9999px', 
@@ -774,36 +786,41 @@ const ConfirmationPage: React.FC = () => {
               height: '630px'
             }}
           >
-            <div className="flex items-center h-full">
-              <div className="bg-white p-3 rounded-md mr-8">
-                <QRCode 
-                  value={getOrderQRValue()} 
-                  size={200}
-                  renderAs="canvas"
-                  includeMargin={false}
-                />
-              </div>
-              <div className="flex-1 text-white">
-                <div className="flex items-center mb-4">
-                  <span className="text-5xl mr-4">{getProductEmoji()}</span>
-                  <span className="font-bold text-4xl">{getProductName()}</span>
+            <div className="flex items-center justify-center h-full">
+              <div className="flex items-start gap-6 max-w-4xl">
+                <div className="bg-white p-4 rounded-md">
+                  <QRCode 
+                    value={getOrderQRValue()} 
+                    size={180}
+                    renderAs="canvas"
+                    includeMargin={false}
+                  />
                 </div>
-                
-                <p className="text-green-300 font-medium text-2xl mb-4">
-                  {order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}
-                </p>
-                
-                <p className="text-5xl font-bold mb-2">
-                  {formatCurrency(order.amount, order.currency)}
-                </p>
-                
-                <p className="text-gray-300 text-xl">
-                  {new Date(order.timestamp || Date.now()).toLocaleString()}
-                </p>
-                
-                <p className="text-gray-300 text-xl mt-4">
-                  merchant-yapp.lovable.app
-                </p>
+                <div className="flex-1 text-white">
+                  <div className="flex items-center">
+                    <span className="text-6xl mr-4">{getProductEmoji()}</span>
+                    <div>
+                      <h1 className="font-bold text-4xl">{getProductName()}</h1>
+                      <p className="text-3xl mt-2 opacity-80">Order #{order.orderId.split('_').pop()}</p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-green-300 font-medium text-3xl mt-6">
+                    {order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}
+                  </p>
+                  
+                  <p className="text-6xl font-bold mt-4">
+                    {formatCurrency(order.amount, order.currency)}
+                  </p>
+                  
+                  <p className="text-gray-300 text-2xl mt-4">
+                    {new Date(order.timestamp || Date.now()).toLocaleString()}
+                  </p>
+                  
+                  <p className="text-gray-300 text-2xl mt-6">
+                    merchant-yapp.lovable.app
+                  </p>
+                </div>
               </div>
             </div>
           </div>
