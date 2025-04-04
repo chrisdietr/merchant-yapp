@@ -469,10 +469,11 @@ const ConfirmationPage: React.FC = () => {
             </div>
           </div>
           
-          {/* Nice looking preview card for saving to gallery */}
+          {/* Hidden preview card for saving to gallery or sharing - not displayed in UI */}
           <div 
             ref={previewCardRef} 
-            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4 mb-6"
+            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4 mb-6 hidden"
+            style={{ position: 'absolute', left: '-9999px', top: '-9999px' }}
           >
             <div className="flex items-start gap-4">
               <div className="bg-white p-2 rounded-md">
@@ -491,6 +492,11 @@ const ConfirmationPage: React.FC = () => {
                 <div className="text-sm space-y-1">
                   <p className="text-green-300 font-medium">{order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}</p>
                   <p className="text-lg font-bold">{formatCurrency(order.amount, order.currency)}</p>
+                  {order.txHash && (
+                    <p className="text-gray-300 text-xs truncate">
+                      Txn: {isCapturing ? order.txHash : `${order.txHash.substring(0, 10)}...`}
+                    </p>
+                  )}
                   <p className="text-gray-300 text-xs">{new Date(order.timestamp || Date.now()).toLocaleString()}</p>
                 </div>
               </div>
@@ -498,15 +504,17 @@ const ConfirmationPage: React.FC = () => {
           </div>
           
           <div className="flex flex-col space-y-3">
-            {/* Only show Telegram contact button if handle exists */}
-            {shopInfo?.telegramHandle && (
+            {/* Only show Telegram contact button if handle exists - Fix issue with buffer compatibility */}
+            {shopInfo && shopInfo.telegramHandle && (
               <a 
                 href={generateTelegramLink(shopInfo.telegramHandle, getTelegramMessage())}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full"
               >
-                <img src="https://i.ibb.co/G3Tsy0m3/Telegram-logo-svg.webp" alt="Telegram" className="h-5 w-5 mr-2" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="#fff">
+                  <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.079l-1.702 8.493c-.127.617-.492.864-1 .539l-2.766-2.04-1.336 1.285c-.148.148-.272.272-.56.272l.2-2.834 5.152-4.651c.225-.196-.049-.308-.345-.112l-6.37 4.009-2.744-.912c-.594-.185-.604-.592.128-.878l10.728-4.136c.494-.179.927.108.765.965z"/>
+                </svg>
                 Contact Seller on Telegram
               </a>
             )}
