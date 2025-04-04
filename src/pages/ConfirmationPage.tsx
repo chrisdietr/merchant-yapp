@@ -43,10 +43,8 @@ const ConfirmationPage: React.FC = () => {
   const [shopInfo, setShopInfo] = useState<any>(null);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [socialPreviewUrl, setSocialPreviewUrl] = useState<string>('');
   const confirmationRef = useRef<HTMLDivElement>(null);
   const previewCardRef = useRef<HTMLDivElement>(null);
-  const socialPreviewRef = useRef<HTMLDivElement>(null);
 
   // Handle screen resize to detect mobile
   useEffect(() => {
@@ -338,13 +336,7 @@ const ConfirmationPage: React.FC = () => {
   };
 
   // Get the order QR code value - includes transaction hash if available
-  const getOrderQRValue = () => {
-    const baseUrl = window.location.origin;
-    if (order.txHash) {
-      return `${baseUrl}/verify/${order.orderId}/${order.txHash}`;
-    }
-    return `${baseUrl}/verify/${order.orderId}`;
-  };
+  const getOrderQRValue = () => window.location.origin + `/verify/${order.orderId}${order.txHash ? `/${order.txHash}` : ''}`;
   
   // Generate the Telegram message with order details
   const getTelegramMessage = () => {
@@ -471,68 +463,6 @@ const ConfirmationPage: React.FC = () => {
     return null;
   };
 
-  // Function to generate social preview image URL - now dynamically creates an image
-  const generateSocialPreviewImage = async () => {
-    if (!socialPreviewRef.current || loading) {
-      return '';
-    }
-    
-    try {
-      // Make the social preview visible temporarily for capturing
-      const previewElement = socialPreviewRef.current;
-      const originalStyles = {
-        position: previewElement.style.position,
-        visibility: previewElement.style.visibility,
-        opacity: previewElement.style.opacity
-      };
-      
-      // Position offscreen but fully render
-      previewElement.style.position = 'fixed';
-      previewElement.style.left = '-9999px';
-      previewElement.style.top = '0';
-      previewElement.style.opacity = '1';
-      previewElement.style.visibility = 'visible';
-      previewElement.style.pointerEvents = 'none';
-      
-      // Wait for rendering
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Generate image
-      const canvas = await html2canvas(previewElement, {
-        backgroundColor: '#25104a',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true
-      });
-      
-      // Reset styles
-      previewElement.style.position = originalStyles.position;
-      previewElement.style.visibility = originalStyles.visibility;
-      previewElement.style.opacity = originalStyles.opacity;
-      
-      // Get data URL
-      const dataUrl = canvas.toDataURL('image/png');
-      return dataUrl;
-    } catch (error) {
-      console.error('Error generating social preview:', error);
-      return '';
-    }
-  };
-
-  // Generate and set the social preview image when order loads
-  useEffect(() => {
-    // Only run this when loading is complete and we have order data
-    if (!loading && order.orderId !== 'unknown') {
-      // Generate the preview image asynchronously
-      generateSocialPreviewImage().then(imageUrl => {
-        if (imageUrl) {
-          setSocialPreviewUrl(imageUrl);
-        }
-      });
-    }
-  }, [loading, order.orderId, order.status]);
-
   // Function to get social media preview title
   const getSocialPreviewTitle = () => {
     const productName = getProductName();
@@ -569,7 +499,7 @@ const ConfirmationPage: React.FC = () => {
 
   return (
     <div className="max-w-lg mx-auto px-4 py-4 md:py-8">
-      {/* Add social media preview metadata */}
+      {/* Static meta tags with order-specific info */}
       <Helmet>
         <title>{getSocialPreviewTitle()}</title>
         <meta name="description" content={getSocialPreviewDescription()} />
@@ -579,7 +509,9 @@ const ConfirmationPage: React.FC = () => {
         <meta property="og:url" content={window.location.href} />
         <meta property="og:title" content={getSocialPreviewTitle()} />
         <meta property="og:description" content={getSocialPreviewDescription()} />
-        {socialPreviewUrl && <meta property="og:image" content={socialPreviewUrl} />}
+        
+        {/* Use a static image URL for consistent results */}
+        <meta property="og:image" content="https://lovable.dev/merchant-yapp-order-preview.png" />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         
@@ -588,7 +520,27 @@ const ConfirmationPage: React.FC = () => {
         <meta name="twitter:url" content={window.location.href} />
         <meta name="twitter:title" content={getSocialPreviewTitle()} />
         <meta name="twitter:description" content={getSocialPreviewDescription()} />
-        {socialPreviewUrl && <meta name="twitter:image" content={socialPreviewUrl} />}
+        <meta name="twitter:image" content="https://lovable.dev/merchant-yapp-order-preview.png" />
+
+        {/* Product-specific structured data for SEO */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Order",
+            "orderNumber": order.orderId,
+            "orderStatus": order.status === 'completed' ? "OrderDelivered" : "OrderProcessing",
+            "priceCurrency": order.currency,
+            "price": order.amount.toString(),
+            "orderDate": order.timestamp ? new Date(order.timestamp).toISOString() : new Date().toISOString(),
+            "acceptedOffer": {
+              "@type": "Offer",
+              "itemOffered": {
+                "@type": "Product",
+                "name": getProductName()
+              }
+            }
+          })}
+        </script>
       </Helmet>
       
       <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Order Confirmation</h1>
@@ -772,57 +724,6 @@ const ConfirmationPage: React.FC = () => {
                 Return to Home
               </Button>
             </Link>
-          </div>
-
-          {/* Hidden element for social media preview image generation - matched to gallery save style but optimized for social */}
-          <div 
-            ref={socialPreviewRef} 
-            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-8"
-            style={{ 
-              position: 'absolute', 
-              left: '-9999px', 
-              visibility: 'hidden',
-              width: '1200px', 
-              height: '630px'
-            }}
-          >
-            <div className="flex items-center justify-center h-full">
-              <div className="flex items-start gap-6 max-w-4xl">
-                <div className="bg-white p-4 rounded-md">
-                  <QRCode 
-                    value={getOrderQRValue()} 
-                    size={180}
-                    renderAs="canvas"
-                    includeMargin={false}
-                  />
-                </div>
-                <div className="flex-1 text-white">
-                  <div className="flex items-center">
-                    <span className="text-6xl mr-4">{getProductEmoji()}</span>
-                    <div>
-                      <h1 className="font-bold text-4xl">{getProductName()}</h1>
-                      <p className="text-3xl mt-2 opacity-80">Order #{order.orderId.split('_').pop()}</p>
-                    </div>
-                  </div>
-                  
-                  <p className="text-green-300 font-medium text-3xl mt-6">
-                    {order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}
-                  </p>
-                  
-                  <p className="text-6xl font-bold mt-4">
-                    {formatCurrency(order.amount, order.currency)}
-                  </p>
-                  
-                  <p className="text-gray-300 text-2xl mt-4">
-                    {new Date(order.timestamp || Date.now()).toLocaleString()}
-                  </p>
-                  
-                  <p className="text-gray-300 text-2xl mt-6">
-                    merchant-yapp.lovable.app
-                  </p>
-                </div>
-              </div>
-            </div>
           </div>
         </>
       )}
