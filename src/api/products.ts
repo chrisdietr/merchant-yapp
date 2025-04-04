@@ -1,15 +1,26 @@
-import { NextResponse } from 'next/server'
+// import { NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
 import { requireAdmin } from '@/lib/auth'
 
 const SHOPS_FILE_PATH = path.join(process.cwd(), 'public', 'shops.json')
 
+// Create a response helper similar to NextResponse
+const createJsonResponse = (data: any, options = {}) => {
+  const { status = 200 } = options as { status?: number };
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+};
+
 export async function POST(request: Request) {
   try {
-    const { address } = request.headers.get('x-user-address')
-    if (!requireAdmin(address)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const userAddress = request.headers.get('x-user-address')
+    if (!userAddress || !requireAdmin(userAddress)) {
+      return createJsonResponse({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const product = await request.json()
@@ -21,7 +32,7 @@ export async function POST(request: Request) {
     const newProduct = {
       id: Date.now().toString(),
       ...product,
-      owner: address,
+      owner: userAddress,
     }
     
     shopsData.products.push(newProduct)
@@ -29,10 +40,10 @@ export async function POST(request: Request) {
     // Write back to file
     fs.writeFileSync(SHOPS_FILE_PATH, JSON.stringify(shopsData, null, 2))
     
-    return NextResponse.json(newProduct)
+    return createJsonResponse(newProduct)
   } catch (error) {
     console.error('Error adding product:', error)
-    return NextResponse.json(
+    return createJsonResponse(
       { error: 'Internal server error' },
       { status: 500 }
     )
@@ -41,9 +52,9 @@ export async function POST(request: Request) {
 
 export async function DELETE(request: Request) {
   try {
-    const { address } = request.headers.get('x-user-address')
-    if (!requireAdmin(address)) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const userAddress = request.headers.get('x-user-address')
+    if (!userAddress || !requireAdmin(userAddress)) {
+      return createJsonResponse({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const { productId } = await request.json()
@@ -53,11 +64,11 @@ export async function DELETE(request: Request) {
     
     // Find and remove product
     const productIndex = shopsData.products.findIndex(
-      (p: any) => p.id === productId && p.owner.toLowerCase() === address.toLowerCase()
+      (p: any) => p.id === productId && p.owner.toLowerCase() === userAddress.toLowerCase()
     )
     
     if (productIndex === -1) {
-      return NextResponse.json(
+      return createJsonResponse(
         { error: 'Product not found or unauthorized' },
         { status: 404 }
       )
@@ -68,10 +79,10 @@ export async function DELETE(request: Request) {
     // Write back to file
     fs.writeFileSync(SHOPS_FILE_PATH, JSON.stringify(shopsData, null, 2))
     
-    return NextResponse.json({ success: true })
+    return createJsonResponse({ success: true })
   } catch (error) {
     console.error('Error deleting product:', error)
-    return NextResponse.json(
+    return createJsonResponse(
       { error: 'Internal server error' },
       { status: 500 }
     )
