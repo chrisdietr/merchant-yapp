@@ -12,13 +12,13 @@
     <meta property="og:description" content="A modern merchant shop with direct purchase functionality" id="og-description" />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="" id="og-url" />
-    <meta property="og:image" id="og-image" content="" />
+    <meta property="og:image" content="" id="og-image" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:title" content="Merchant Yapp Shop" id="twitter-title" />
     <meta name="twitter:description" content="A modern merchant shop with direct purchase functionality" id="twitter-description" />
-    <meta name="twitter:image" id="twitter-image" content="" />
+    <meta name="twitter:image" content="" id="twitter-image" />
     
     <!-- Meta tag update script -->
     <script>
@@ -39,6 +39,8 @@
           
           // Generate dynamic title and description
           let productName = "Product";
+          let shopName = "Merchant Yapp Shop";
+          
           if (orderId && orderId.startsWith('product_')) {
             const productId = orderId.split('_')[1];
             
@@ -49,14 +51,25 @@
               "3": "Hoodie"
             };
             
+            // Map product IDs to shop names
+            const shopMap = {
+              "1": "Merchant Yapp Demo Shop",
+              "2": "Merchant Yapp Demo Shop",
+              "3": "Merchant Yapp Demo Shop"
+            };
+            
             if (productMap[productId]) {
               productName = productMap[productId];
             }
+            
+            if (shopMap[productId]) {
+              shopName = shopMap[productId];
+            }
           }
           
-          // Update meta tags
-          const title = `${productName} Order - Payment Complete`;
-          const description = `Order confirmation for ${productName}${amount ? ' - ' + amount : ''}. Thank you for your purchase!`;
+          // Update meta tags with new format requested by user
+          const title = `Purchase confirmed ✅`;
+          const description = `Just bought ${productName} from ${shopName}`;
           
           // Generate absolute URLs
           const baseUrl = window.location.origin;
@@ -82,6 +95,42 @@
           document.getElementById('twitter-description').setAttribute('content', description);
           document.getElementById('twitter-image').setAttribute('content', socialPreviewUrl);
           
+          // Also directly update meta tags that might have different names
+          const metaTags = document.getElementsByTagName('meta');
+          for (let i = 0; i < metaTags.length; i++) {
+            const tag = metaTags[i];
+            
+            // Update any property="og:title" tags
+            if (tag.getAttribute('property') === 'og:title') {
+              tag.setAttribute('content', title);
+            }
+            
+            // Update any property="og:description" tags
+            if (tag.getAttribute('property') === 'og:description') {
+              tag.setAttribute('content', description);
+            }
+            
+            // Update any property="og:image" tags
+            if (tag.getAttribute('property') === 'og:image') {
+              tag.setAttribute('content', socialPreviewUrl);
+            }
+            
+            // Update any name="twitter:title" tags
+            if (tag.getAttribute('name') === 'twitter:title') {
+              tag.setAttribute('content', title);
+            }
+            
+            // Update any name="twitter:description" tags
+            if (tag.getAttribute('name') === 'twitter:description') {
+              tag.setAttribute('content', description);
+            }
+            
+            // Update any name="twitter:image" tags
+            if (tag.getAttribute('name') === 'twitter:image') {
+              tag.setAttribute('content', socialPreviewUrl);
+            }
+          }
+          
           console.log('Meta tags updated successfully');
         }
       }
@@ -92,6 +141,9 @@
       
       // Also run when URL changes (for SPA behavior)
       window.addEventListener('popstate', updateMetaTags);
+      
+      // Additional fallback - run after a short delay to ensure all tags are loaded
+      setTimeout(updateMetaTags, 500);
     </script>
   </head>
 
