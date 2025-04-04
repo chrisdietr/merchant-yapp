@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import OrderScanner from '../components/OrderScanner';
+import OrderScanner from '@/components/OrderScanner';
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from '@/contexts/AuthContext';
+import { ProtectedRoute } from '@/components/ProtectedRoute';
 
 const AdminScannerPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
@@ -33,72 +34,42 @@ const AdminScannerPage: React.FC = () => {
   }
 
   return (
-    <div className="max-w-lg mx-auto px-4 py-4 md:py-6">
-      <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6 text-center text-green-100">Admin Order Scanner</h1>
-      
-      {!address ? (
-        <div className="text-center p-4 md:p-6 bg-gradient-to-br from-green-900/60 to-green-800/60 text-white rounded-lg mb-4 md:mb-6 border border-green-400/30">
-          <h2 className="text-base md:text-lg font-semibold mb-2">Wallet Connection Required</h2>
-          <p className="mb-4 text-xs md:text-sm text-green-200/80">
-            Please connect your wallet to access the admin scanner.
-          </p>
-          <Button onClick={() => navigate('/')} className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 border-0">
-            Return to Home
-          </Button>
-        </div>
-      ) : !isAdmin ? (
-        <Alert variant="destructive" className="mb-4 md:mb-6">
-          <AlertTitle>Access Denied</AlertTitle>
-          <AlertDescription className="space-y-3 text-sm">
-            <p>
-              The connected wallet ({address.substring(0, 6)}...{address.substring(address.length - 4)}) 
-              is not authorized to access this page.
-            </p>
-            <p>
-              Please connect with an admin wallet to continue.
-            </p>
-          </AlertDescription>
-        </Alert>
-      ) : !isAuthenticated ? (
-        <Alert className="mb-4 md:mb-6 bg-gradient-to-br from-green-900/60 to-green-800/60 border border-green-400/30">
-          <AlertTitle className="text-green-100">Authentication Required</AlertTitle>
-          <AlertDescription className="space-y-3 text-xs md:text-sm text-green-200/80">
-            <p>
-              Your wallet has admin privileges, but you need to sign in with Ethereum to access admin tools.
-            </p>
-            <div className="pt-2">
-              <Button 
-                onClick={() => signIn()}
-                disabled={isLoading}
-                className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 mt-2 border-0 text-sm"
-              >
-                {isLoading ? 'Signing...' : 'Sign-In with Ethereum'}
-              </Button>
+    <ProtectedRoute>
+      <div className="max-w-4xl mx-auto p-4 md:p-6">
+        <h1 className="text-2xl md:text-3xl font-bold mb-4 md:mb-6">Admin Order Scanner</h1>
+        
+        {isAdmin && isAuthenticated ? (
+          <>
+            <div className="bg-card p-4 border rounded-lg mb-6">
+              <h2 className="text-lg font-medium mb-2 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                Admin Scanner Features
+              </h2>
+              <ul className="list-disc list-inside space-y-1 text-sm md:text-base">
+                <li>Scan QR codes from customer payment confirmations</li>
+                <li>Verify payment status and transaction details instantly</li>
+                <li>See product information including emoji and description</li>
+                <li>View buyer's wallet address for transaction verification</li>
+                <li>Access direct links to blockchain transactions</li>
+              </ul>
+              <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-950/40 rounded-md border border-blue-200 dark:border-blue-900 text-blue-800 dark:text-blue-300 text-sm">
+                <strong>Pro Tip:</strong> Position the QR code from the customer's payment confirmation screen directly in the scanner frame for best results.
+              </div>
             </div>
-          </AlertDescription>
-        </Alert>
-      ) : (
-        <>
-          <Alert className="mb-4 md:mb-6 bg-gradient-to-br from-green-900/60 to-green-800/60 border border-green-400/30">
-            <AlertTitle className="text-green-100">Admin Access Granted</AlertTitle>
-            <AlertDescription className="text-xs md:text-sm text-green-200/80">
-              You can now scan customer order QR codes to verify payment details.
+            <OrderScanner isAdmin={true} />
+          </>
+        ) : (
+          <Alert variant="destructive">
+            <AlertTitle>Admin Access Required</AlertTitle>
+            <AlertDescription>
+              You do not have permission to use the Admin Scanner. Please sign in with an admin account.
             </AlertDescription>
           </Alert>
-          
-          <OrderScanner isAdmin={true} />
-        </>
-      )}
-
-      <div className="mt-4 md:mt-6 text-center">
-        <Button
-          className="bg-gradient-to-r from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 border-0"
-          onClick={() => navigate('/')}
-        >
-          Back to Home
-        </Button>
+        )}
       </div>
-    </div>
+    </ProtectedRoute>
   );
 };
 

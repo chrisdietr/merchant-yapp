@@ -324,9 +324,19 @@ const ConfirmationPage: React.FC = () => {
   const getTelegramMessage = () => {
     const productName = order.productName || 'a product';
     const shopName = shopInfo?.name || 'your shop';
-    const txnUrl = order.txHash ? `https://yodl.me/tx/${order.txHash}` : '';
+    const orderLink = getOrderQRValue(); // Use the order verification link instead of txn URL
     
-    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from? Here's the payment confirmation: ${txnUrl}`;
+    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from? Here's the payment confirmation: ${orderLink}`;
+  };
+
+  // Find product emoji from productId in the orderId
+  const getProductEmoji = () => {
+    if (orderId && orderId.startsWith('product_')) {
+      const productId = orderId.split('_')[1];
+      const product = shopsData.products.find((p: any) => p.id === productId);
+      return product?.emoji || '🛒';
+    }
+    return '🛒'; // Default shopping cart emoji
   };
 
   return (
@@ -384,33 +394,36 @@ const ConfirmationPage: React.FC = () => {
                 </span>
               </div>
               
-              {/* Product Name - Always show this section */}
-              <div className="flex justify-between">
+              {/* Product Name with Emoji - Always show this section */}
+              <div className="flex justify-between items-center">
                 <span className="text-black dark:text-foreground/70">Product:</span>
-                <span className="font-medium text-black dark:text-white">
-                  {(() => {
-                    // If we have a product name directly, use it
-                    if (order.productName) {
-                      return order.productName;
-                    }
-                    
-                    // Otherwise try to derive it from the order ID
-                    if (order.orderId && order.orderId.startsWith('product_')) {
-                      const productId = order.orderId.split('_')[1];
-                      
-                      // Check if we have a mapping in our product map
-                      if (productMap[productId]) {
-                        return productMap[productId];
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{getProductEmoji()}</span>
+                  <span className="font-medium text-black dark:text-white">
+                    {(() => {
+                      // If we have a product name directly, use it
+                      if (order.productName) {
+                        return order.productName;
                       }
                       
-                      // Last resort: show a basic name with the product ID
-                      return `Product #${productId}`;
-                    }
-                    
-                    // Absolute fallback
-                    return 'Unknown Product';
-                  })()}
-                </span>
+                      // Otherwise try to derive it from the order ID
+                      if (order.orderId && order.orderId.startsWith('product_')) {
+                        const productId = order.orderId.split('_')[1];
+                        
+                        // Check if we have a mapping in our product map
+                        if (productMap[productId]) {
+                          return productMap[productId];
+                        }
+                        
+                        // Last resort: show a basic name with the product ID
+                        return `Product #${productId}`;
+                      }
+                      
+                      // Absolute fallback
+                      return 'Unknown Product';
+                    })()}
+                  </span>
+                </div>
               </div>
               
               {/* Transaction hash moved below Order ID */}
@@ -453,6 +466,35 @@ const ConfirmationPage: React.FC = () => {
                 </div>
               )}
             </div>
+          </div>
+          
+          {/* Link Preview Card */}
+          <div className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4 mb-6">
+            <h3 className="text-white text-lg font-semibold mb-3">Shareable Link Preview</h3>
+            <div className="flex items-start gap-4">
+              <div className="bg-white p-2 rounded-md">
+                <QRCode 
+                  value={getOrderQRValue()} 
+                  size={80}
+                  renderAs="canvas"
+                  includeMargin={false}
+                />
+              </div>
+              <div className="flex-1 text-white">
+                <div className="flex items-center mb-2">
+                  <span className="text-2xl mr-2">{getProductEmoji()}</span>
+                  <span className="font-medium">{order.productName || 'Product Order'}</span>
+                </div>
+                <div className="text-sm space-y-1">
+                  <p className="text-green-300 font-medium">{order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}</p>
+                  <p className="text-lg font-bold">{formatCurrency(order.amount, order.currency)}</p>
+                  <p className="text-gray-300 text-xs">{new Date(order.timestamp || Date.now()).toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+            <p className="text-xs text-gray-300 mt-3">
+              This is how your order will appear when shared via the verification link
+            </p>
           </div>
           
           <div className="flex flex-col space-y-3">
