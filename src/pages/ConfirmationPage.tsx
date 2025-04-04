@@ -336,11 +336,34 @@ const ConfirmationPage: React.FC = () => {
   
   // Generate the Telegram message with order details
   const getTelegramMessage = () => {
-    const productName = order.productName || 'a product';
-    const shopName = shopInfo?.name || 'your shop';
+    // Use the robust getProductName function instead of fallback
+    const productName = getProductName();
+    
+    // Get proper shop name, similar to the telegramHandle logic
+    let shopName = 'your shop';
+    
+    // First try to get shop name from shopInfo
+    if (shopInfo && shopInfo.name) {
+      shopName = shopInfo.name;
+    } 
+    // If not found, try to find shop from ownerAddress
+    else if (order.ownerAddress) {
+      const shop = getShopByOwnerAddress(order.ownerAddress);
+      if (shop && shop.name) {
+        shopName = shop.name;
+      }
+    }
+    // Last resort: use first shop name from config
+    else if (shopsData.shops && shopsData.shops.length > 0) {
+      shopName = shopsData.shops[0].name || 'your shop';
+    }
+    
+    // Debug the shop name
+    console.log('Shop name for message:', shopName, 'Product name:', productName);
+    
     const orderLink = getOrderQRValue(); // Use the order verification link instead of txn URL
     
-    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from? Order confirmation: ${orderLink}`;
+    return `Hey, I just bought a ${productName} from ${shopName}. Where can I pick it up from? Order confirmation: ${orderLink}`;
   };
 
   // Find product emoji from productId in the orderId
