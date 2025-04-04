@@ -8,6 +8,7 @@ import { formatCurrency } from '../utils/currency';
 import { getShopByOwnerAddress, generateTelegramLink } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 import shopsData from "@/config/shops.json";
+import { Helmet } from 'react-helmet';
 
 // Order details interface
 interface OrderDetails {
@@ -42,8 +43,10 @@ const ConfirmationPage: React.FC = () => {
   const [shopInfo, setShopInfo] = useState<any>(null);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [socialPreviewUrl, setSocialPreviewUrl] = useState<string>('');
   const confirmationRef = useRef<HTMLDivElement>(null);
   const previewCardRef = useRef<HTMLDivElement>(null);
+  const socialPreviewRef = useRef<HTMLDivElement>(null);
 
   // Handle screen resize to detect mobile
   useEffect(() => {
@@ -468,8 +471,114 @@ const ConfirmationPage: React.FC = () => {
     return null;
   };
 
+  // Function to generate social preview image URL - now dynamically creates an image
+  const generateSocialPreviewImage = async () => {
+    if (!socialPreviewRef.current || loading) {
+      return '';
+    }
+    
+    try {
+      // Make the social preview visible temporarily for capturing
+      const previewElement = socialPreviewRef.current;
+      const originalStyles = {
+        position: previewElement.style.position,
+        visibility: previewElement.style.visibility,
+        opacity: previewElement.style.opacity
+      };
+      
+      // Position offscreen but fully render
+      previewElement.style.position = 'fixed';
+      previewElement.style.left = '-9999px';
+      previewElement.style.top = '0';
+      previewElement.style.opacity = '1';
+      previewElement.style.visibility = 'visible';
+      previewElement.style.pointerEvents = 'none';
+      
+      // Wait for rendering
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Generate image
+      const canvas = await html2canvas(previewElement, {
+        backgroundColor: '#25104a',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true
+      });
+      
+      // Reset styles
+      previewElement.style.position = originalStyles.position;
+      previewElement.style.visibility = originalStyles.visibility;
+      previewElement.style.opacity = originalStyles.opacity;
+      
+      // Get data URL
+      const dataUrl = canvas.toDataURL('image/png');
+      return dataUrl;
+    } catch (error) {
+      console.error('Error generating social preview:', error);
+      return '';
+    }
+  };
+
+  // Generate and set the social preview image when order loads
+  useEffect(() => {
+    // Only run this when loading is complete and we have order data
+    if (!loading && order.orderId !== 'unknown') {
+      // Generate the preview image asynchronously
+      generateSocialPreviewImage().then(imageUrl => {
+        if (imageUrl) {
+          setSocialPreviewUrl(imageUrl);
+        }
+      });
+    }
+  }, [loading, order.orderId, order.status]);
+
+  // Function to get social media preview title
+  const getSocialPreviewTitle = () => {
+    const productName = getProductName();
+    const status = order.status === 'completed' ? 'Payment Confirmed' : 'Payment Pending';
+    return `${productName} - ${status}`;
+  };
+
+  // Function to get social media preview description
+  const getSocialPreviewDescription = () => {
+    const productName = getProductName();
+    const amount = formatCurrency(order.amount, order.currency);
+    let shopName = 'Merchant Shop';
+    
+    if (shopInfo && shopInfo.name) {
+      shopName = shopInfo.name;
+    } else if (shopsData.shops && shopsData.shops.length > 0) {
+      shopName = shopsData.shops[0].name;
+    }
+    
+    return `${productName} ordered from ${shopName} for ${amount}. ${order.status === 'completed' ? 'Payment confirmed.' : 'Payment pending.'}`;
+  };
+
   return (
     <div className="max-w-lg mx-auto px-4 py-4 md:py-8">
+      {/* Add social media preview metadata */}
+      <Helmet>
+        <title>{getSocialPreviewTitle()}</title>
+        <meta name="description" content={getSocialPreviewDescription()} />
+        
+        {/* Open Graph / Facebook */}
+        <meta property="og:type" content="website" />
+        <meta property="og:url" content={window.location.href} />
+        <meta property="og:title" content={getSocialPreviewTitle()} />
+        <meta property="og:description" content={getSocialPreviewDescription()} />
+        {socialPreviewUrl && <meta property="og:image" content={socialPreviewUrl} />}
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:url" content={window.location.href} />
+        <meta name="twitter:title" content={getSocialPreviewTitle()} />
+        <meta name="twitter:description" content={getSocialPreviewDescription()} />
+        {socialPreviewUrl && <meta name="twitter:image" content={socialPreviewUrl} />}
+      </Helmet>
+      
       <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Order Confirmation</h1>
       
       {loading ? (
@@ -651,6 +760,52 @@ const ConfirmationPage: React.FC = () => {
                 Return to Home
               </Button>
             </Link>
+          </div>
+
+          {/* Hidden element for social media preview image generation */}
+          <div 
+            ref={socialPreviewRef} 
+            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-6"
+            style={{ 
+              position: 'absolute', 
+              left: '-9999px', 
+              visibility: 'hidden',
+              width: '1200px', 
+              height: '630px'
+            }}
+          >
+            <div className="flex items-center h-full">
+              <div className="bg-white p-3 rounded-md mr-8">
+                <QRCode 
+                  value={getOrderQRValue()} 
+                  size={200}
+                  renderAs="canvas"
+                  includeMargin={false}
+                />
+              </div>
+              <div className="flex-1 text-white">
+                <div className="flex items-center mb-4">
+                  <span className="text-5xl mr-4">{getProductEmoji()}</span>
+                  <span className="font-bold text-4xl">{getProductName()}</span>
+                </div>
+                
+                <p className="text-green-300 font-medium text-2xl mb-4">
+                  {order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}
+                </p>
+                
+                <p className="text-5xl font-bold mb-2">
+                  {formatCurrency(order.amount, order.currency)}
+                </p>
+                
+                <p className="text-gray-300 text-xl">
+                  {new Date(order.timestamp || Date.now()).toLocaleString()}
+                </p>
+                
+                <p className="text-gray-300 text-xl mt-4">
+                  merchant-yapp.lovable.app
+                </p>
+              </div>
+            </div>
           </div>
         </>
       )}
