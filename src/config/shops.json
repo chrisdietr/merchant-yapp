@@ -30,7 +30,7 @@
       "name": "Beer",
       "description": "Infinite stock.",
       "price": 0.69,
-      "currency": "ARS",
+      "currency": "THB",
       "emoji": "🍺",
       "inStock": "true"
     }
