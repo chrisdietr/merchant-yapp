@@ -14,12 +14,20 @@ interface OrderData {
   timestamp: string;
   amount?: number;
   currency?: string;
-  status: string;
+  status?: string;
   txHash?: string;
   nonce?: string;
   productName?: string;
   productId?: string;
   senderAddress?: string;
+  emoji?: string;
+  // Add fields for nested structure
+  shopInfo?: {
+    name?: string;
+    ownerAddress?: string;
+  };
+  name?: string; // Product name could be at this level too
+  price?: number;
 }
 
 interface ProductData {
@@ -42,6 +50,7 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
   const [error, setError] = useState<string | null>(null);
   const [rawScanData, setRawScanData] = useState<string | null>(null);
   const [productDetails, setProductDetails] = useState<ProductData | null>(null);
+  const [debugDetails, setDebugDetails] = useState<string | null>(null);
   
   // Double-check admin status with AuthContext for security
   const { isAdmin: contextIsAdmin, isAuthenticated } = useAuth();
@@ -63,37 +72,67 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
   useEffect(() => {
     if (rawScanData) {
       console.log('Raw QR Data Received:', rawScanData);
+      setDebugDetails(`Raw data: ${rawScanData}`);
     }
   }, [rawScanData]);
 
   // Look up product details when scanned data changes
   useEffect(() => {
-    if (scannedData?.productId) {
-      console.log('Looking up product details for:', scannedData.productId);
+    if (!scannedData) return;
+    
+    console.log('Scanned data changed:', scannedData);
+    setDebugDetails(prev => `${prev || ''}\nScanned data: ${JSON.stringify(scannedData, null, 2)}`);
+    
+    // Direct emoji from QR code if available
+    if (scannedData.emoji) {
+      console.log('Using emoji directly from QR data:', scannedData.emoji);
+      
+      // If we have emoji and product name, create a synthetic product
+      if (scannedData.name || scannedData.productName) {
+        const syntheticProduct: ProductData = {
+          id: scannedData.productId || 'unknown',
+          name: scannedData.name || scannedData.productName || 'Unknown Product',
+          description: '',
+          price: scannedData.price || 0,
+          currency: scannedData.currency || 'UNKNOWN',
+          emoji: scannedData.emoji,
+          inStock: true
+        };
+        console.log('Created synthetic product:', syntheticProduct);
+        setProductDetails(syntheticProduct);
+        return;
+      }
+    }
+    
+    if (scannedData.productId) {
+      console.log('Looking up product details for ID:', scannedData.productId);
       const product = shopsData.products.find(p => p.id === scannedData.productId);
       if (product) {
-        console.log('Found product details:', product);
+        console.log('Found product details by ID:', product);
         setProductDetails(product);
+        return;
       } else {
-        console.log('Product not found in shops.json');
-        setProductDetails(null);
+        console.log('Product not found in shops.json by ID');
       }
-    } else if (scannedData?.productName) {
+    }
+    
+    if (scannedData.productName || scannedData.name) {
       // Try to find product by name if id is not available
-      console.log('Looking up product by name:', scannedData.productName);
+      const productName = scannedData.productName || scannedData.name;
+      console.log('Looking up product by name:', productName);
       const product = shopsData.products.find(
-        p => p.name.toLowerCase() === scannedData.productName?.toLowerCase()
+        p => p.name.toLowerCase() === productName?.toLowerCase()
       );
       if (product) {
         console.log('Found product by name:', product);
         setProductDetails(product);
+        return;
       } else {
         console.log('Product not found by name');
-        setProductDetails(null);
       }
-    } else {
-      setProductDetails(null);
     }
+    
+    setProductDetails(null);
   }, [scannedData]);
 
   const handleScanResult = (result: string) => {
@@ -137,7 +176,9 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
                 productName: orderInfo.productName,
                 productId: orderInfo.productId,
                 senderAddress: orderInfo.senderAddress,
-                nonce: orderInfo.nonce
+                emoji: orderInfo.emoji,
+                nonce: orderInfo.nonce,
+                name: orderInfo.name || orderInfo.productName
               });
               setScanning(false);
               setError(null);
@@ -173,16 +214,42 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
       // If not a URL, try to parse as JSON
       console.log('Attempting to parse as JSON');
       try {
-        const parsedData = JSON.parse(result) as OrderData;
+        const parsedData = JSON.parse(result);
         console.log('Parsed JSON data:', parsedData);
         
-        // Validate that the scanned data is indeed an order
-        if (!parsedData.orderId || !parsedData.timestamp) {
+        // Extract fields from any structure
+        const orderData: OrderData = {
+          // Use the direct field or look in nested shopInfo
+          orderId: parsedData.orderId || `ORDER-${Date.now()}`,
+          timestamp: parsedData.timestamp || new Date().toISOString(),
+          status: parsedData.status || 'pending',
+          productId: parsedData.productId,
+          productName: parsedData.productName || parsedData.name,
+          name: parsedData.name || parsedData.productName,
+          amount: parsedData.amount || parsedData.price,
+          price: parsedData.price,
+          currency: parsedData.currency,
+          senderAddress: parsedData.senderAddress || parsedData.from,
+          emoji: parsedData.emoji,
+          txHash: parsedData.txHash,
+          // Keep the shopInfo if available
+          shopInfo: parsedData.shopInfo
+        };
+        
+        console.log('Normalized order data:', orderData);
+        
+        // Only require minimal validation - need either orderId or timestamp
+        if (!orderData.orderId && !orderData.timestamp) {
           console.error('Invalid QR format - missing required fields');
-          throw new Error('Invalid QR code format. Not a valid order.');
+          throw new Error('Invalid QR code format. Missing orderId and timestamp.');
         }
         
-        setScannedData(parsedData);
+        // Store complete order in localStorage for future reference
+        if (orderData.orderId) {
+          yodlService.storeOrderInfo(orderData.orderId, parsedData);
+        }
+        
+        setScannedData(orderData);
         setScanning(false);
         setError(null);
       } catch (jsonError) {
@@ -213,6 +280,8 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
           txHash,
           timestamp: paymentDetails.timestamp || paymentDetails.blockTimestamp || paymentDetails.created || new Date().toISOString(),
           productName: paymentDetails.productName,
+          name: paymentDetails.name || paymentDetails.productName,
+          emoji: paymentDetails.emoji,
           senderAddress: paymentDetails.from || paymentDetails.senderAddress,
         };
         
@@ -239,6 +308,7 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
     setError(null);
     setScanning(false);
     setProductDetails(null);
+    setDebugDetails(null);
   };
 
   const startScanning = () => {
@@ -247,6 +317,7 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
     setRawScanData(null);
     setError(null);
     setProductDetails(null);
+    setDebugDetails(null);
   };
 
   // Format wallet address for display
@@ -283,14 +354,14 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
                   <h3 className="text-base md:text-lg font-medium text-green-300 mb-2">Order Details</h3>
                   
                   {/* Product information with emoji */}
-                  {(productDetails || scannedData.productName) && (
+                  {(productDetails || scannedData.emoji || scannedData.productName || scannedData.name) && (
                     <div className="bg-green-900/40 rounded-md mb-3 p-2 flex items-center gap-2">
                       <span className="text-2xl">
-                        {productDetails?.emoji || "🛒"}
+                        {scannedData.emoji || productDetails?.emoji || "🛒"}
                       </span>
                       <div>
                         <p className="font-medium text-green-200">
-                          {productDetails?.name || scannedData.productName}
+                          {scannedData.name || scannedData.productName || productDetails?.name || "Unknown Product"}
                         </p>
                         {productDetails?.description && (
                           <p className="text-xs text-green-300/70">{productDetails.description}</p>
@@ -306,7 +377,8 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
                       scannedData.status === 'failed' ? 'bg-red-500/30 text-red-200' : 
                       'bg-yellow-500/30 text-yellow-200'
                     }`}>
-                      {scannedData.status.charAt(0).toUpperCase() + scannedData.status.slice(1)}
+                      {scannedData.status === 'completed' ? 'Completed' : 
+                       scannedData.status === 'failed' ? 'Failed' : 'Pending'}
                     </span></p>
                     
                     {/* Buyer's wallet address */}
@@ -325,8 +397,8 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
                     )}
                     
                     <p><span className="font-semibold">Date:</span> {new Date(scannedData.timestamp).toLocaleString()}</p>
-                    {scannedData.amount && scannedData.currency && (
-                      <p><span className="font-semibold">Amount:</span> {scannedData.amount} {scannedData.currency}</p>
+                    {(scannedData.amount || scannedData.price) && scannedData.currency && (
+                      <p><span className="font-semibold">Amount:</span> {scannedData.amount || scannedData.price} {scannedData.currency}</p>
                     )}
                     {scannedData.txHash && (
                       <div>
@@ -352,11 +424,11 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
                 </Alert>
               )}
               
-              {rawScanData && !scannedData && (
+              {debugDetails && !scannedData && (
                 <Alert className="mb-3 md:mb-4 text-xs md:text-sm">
                   <AlertTitle>Debug Info</AlertTitle>
-                  <AlertDescription className="break-all">
-                    <p>Raw data: {rawScanData.substring(0, 100)}{rawScanData.length > 100 ? '...' : ''}</p>
+                  <AlertDescription className="break-all whitespace-pre-wrap text-[10px]">
+                    {debugDetails}
                   </AlertDescription>
                 </Alert>
               )}
