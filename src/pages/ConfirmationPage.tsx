@@ -214,6 +214,14 @@ const ConfirmationPage: React.FC = () => {
     }
   }, [orderId]);
 
+  // Effect to generate social preview when data is ready
+  useEffect(() => {
+    if (order.status === 'completed' && order.productName && shopInfo?.name && !socialPreviewUrl) {
+      generateSocialPreviewImage();
+    }
+    // Regenerate if key data changes (optional, depends on desired behavior)
+  }, [order.status, order.productName, shopInfo, socialPreviewUrl]); // Added dependencies
+
   // Fetch payment details from Yodl API
   const fetchPaymentDetails = async (txHash: string) => {
     try {
@@ -520,65 +528,29 @@ const ConfirmationPage: React.FC = () => {
     }
   };
 
-  // Generate and set the social preview image when order loads
-  useEffect(() => {
-    // Only run this when loading is complete and we have order data
-    if (!loading && order.orderId !== 'unknown') {
-      // Generate the preview image asynchronously
-      generateSocialPreviewImage().then(imageUrl => {
-        if (imageUrl) {
-          setSocialPreviewUrl(imageUrl);
-        }
-      });
-    }
-  }, [loading, order.orderId, order.status]);
+  // Helper function to get the title for meta tags
+  const getMetaTitle = () => "Purchase confirmed ✅";
 
-  // Function to get social media preview title
-  const getSocialPreviewTitle = () => {
-    const productName = getProductName();
-    const status = order.status === 'completed' ? 'Payment Confirmed' : 'Payment Pending';
-    let shopName = 'Merchant Shop';
-    
-    if (shopInfo && shopInfo.name) {
-      shopName = shopInfo.name;
-    } else if (shopsData.shops && shopsData.shops.length > 0) {
-      shopName = shopsData.shops[0].name;
+  // Helper function to get the description for meta tags
+  const getMetaDescription = () => {
+    if (order.status === 'completed' && order.productName && shopInfo?.name) {
+      return `Just bought ${order.productName} from ${shopInfo.name}`;
     }
-    
-    // Create a more descriptive title with 30-60 characters
-    return `${productName} | ${status} | Order from ${shopName}`;
-  };
-
-  // Function to get social media preview description
-  const getSocialPreviewDescription = () => {
-    const productName = getProductName();
-    const amount = formatCurrency(order.amount, order.currency);
-    let shopName = 'Merchant Shop';
-    
-    if (shopInfo && shopInfo.name) {
-      shopName = shopInfo.name;
-    } else if (shopsData.shops && shopsData.shops.length > 0) {
-      shopName = shopsData.shops[0].name;
-    }
-    
-    const date = new Date(order.timestamp || Date.now()).toLocaleString();
-    
-    // More detailed description with order details
-    return `${productName} purchased from ${shopName} for ${amount}. Order ID: ${order.orderId}. ${order.status === 'completed' ? 'Payment confirmed on ' : 'Payment pending as of '} ${date}.`;
+    return "View your purchase confirmation."; // Fallback description
   };
 
   return (
     <div className="max-w-lg mx-auto px-4 py-4 md:py-8">
       {/* Add social media preview metadata */}
       <Helmet>
-        <title>{getSocialPreviewTitle()}</title>
-        <meta name="description" content={getSocialPreviewDescription()} />
+        <title>{getMetaTitle()}</title>
+        <meta name="description" content={getMetaDescription()} />
         
         {/* Open Graph / Facebook */}
         <meta property="og:type" content="website" />
         <meta property="og:url" content={window.location.href} />
-        <meta property="og:title" content={getSocialPreviewTitle()} />
-        <meta property="og:description" content={getSocialPreviewDescription()} />
+        <meta property="og:title" content={getMetaTitle()} />
+        <meta property="og:description" content={getMetaDescription()} />
         {socialPreviewUrl && <meta property="og:image" content={socialPreviewUrl} />}
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
@@ -586,8 +558,8 @@ const ConfirmationPage: React.FC = () => {
         {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:url" content={window.location.href} />
-        <meta name="twitter:title" content={getSocialPreviewTitle()} />
-        <meta name="twitter:description" content={getSocialPreviewDescription()} />
+        <meta name="twitter:title" content={getMetaTitle()} />
+        <meta name="twitter:description" content={getMetaDescription()} />
         {socialPreviewUrl && <meta name="twitter:image" content={socialPreviewUrl} />}
       </Helmet>
       

@@ -11,7 +11,6 @@ import ConfirmationPage from "@/pages/ConfirmationPage";
 import ProductPage from "@/pages/ProductPage";
 import AdminScannerPage from "@/pages/AdminScannerPage";
 import VerifyPage from "@/pages/VerifyPage";
-import SocialPreviewImage from "@/pages/SocialPreviewImage";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import { Toaster } from "@/components/ui/toaster";
@@ -31,7 +30,6 @@ export default function App() {
               <Router>
                 <Routes>
                   {/* Special route for social media previews - no layout */}
-                  <Route path="/social-preview/:orderId/:txHash?" element={<SocialPreviewImage />} />
                   
                   {/* All other routes wrapped in Layout */}
                   <Route element={<Layout />}>
