@@ -5,7 +5,7 @@ export interface Product {
   price: number
   currency: string
   emoji: string
-  owner: string
+  owner?: string
   inStock?: string | boolean
 }
 
