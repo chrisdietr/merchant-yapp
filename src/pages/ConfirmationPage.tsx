@@ -48,17 +48,9 @@ const ConfirmationPage: React.FC = () => {
 
   // Handle screen resize to detect mobile
   useEffect(() => {
-    const checkIsMobile = () => {
-      setIsMobile(window.innerWidth < 768);
-    };
-    
-    // Check initially
+    const checkIsMobile = () => setIsMobile(window.innerWidth < 768);
     checkIsMobile();
-    
-    // Listen for resize events
     window.addEventListener('resize', checkIsMobile);
-    
-    // Cleanup
     return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
 
@@ -76,39 +68,21 @@ const ConfirmationPage: React.FC = () => {
     // Initialize orderInfo with data from localStorage
     const storedOrderInfo = yodlService.getOrderInfo(orderId);
     
-    // DEBUG: Directly check all orders in localStorage
-    try {
-      const allOrders = localStorage.getItem('yodl_orders');
-      console.log('All orders in localStorage:', allOrders ? JSON.parse(allOrders) : 'No orders found');
-    } catch (e) {
-      console.error('Error parsing localStorage orders:', e);
-    }
-    
-    // Debug logging to identify issue
-    console.log('Order ID:', orderId);
-    console.log('Stored order info:', storedOrderInfo);
-    console.log('Product map:', productMap);
-    
     // Extract product ID from order ID (format: product_ID_TIMESTAMP)
     let productId = '';
     let foundProductName = '';
     
-    if (orderId) {
+    if (orderId && orderId.startsWith('product_')) {
       const parts = orderId.split('_');
       if (parts.length >= 2 && parts[0] === 'product') {
         productId = parts[1];
-        console.log('Product ID extracted:', productId);
         
         // Check if we have this product in our map
         if (productMap[productId]) {
           foundProductName = productMap[productId];
-          console.log('Found product name from product map:', foundProductName);
         }
       }
     }
-    
-    // For testing, explicitly check if we have products in shopsData
-    console.log('Available products in shops data:', shopsData.products);
     
     // Check if this looks like a product order ID
     if (orderId && orderId.startsWith('product_')) {
@@ -116,7 +90,6 @@ const ConfirmationPage: React.FC = () => {
       try {
         // First try product map
         if (foundProductName) {
-          console.log('Using product name from product map:', foundProductName);
           setOrder(prev => ({
             ...prev,
             productName: foundProductName
@@ -125,7 +98,6 @@ const ConfirmationPage: React.FC = () => {
           // Check shops.json directly for this product ID
           const productFromShops = shopsData.products.find((p: any) => p.id === productId);
           if (productFromShops) {
-            console.log('Found product directly in shops.json:', productFromShops.name);
             setOrder(prev => ({
               ...prev,
               productName: productFromShops.name
@@ -140,16 +112,13 @@ const ConfirmationPage: React.FC = () => {
               const matchingOrders = Object.values(parsedOrders).filter((order: any) => 
                 order.productName && order.orderId && order.orderId.includes(`product_${productId}`)
               );
-              console.log('Matching orders with same product ID:', matchingOrders);
               
               if (matchingOrders.length > 0) {
                 // Use the product name from the first matching order
                 const matchedProductName = (matchingOrders[0] as any).productName;
-                console.log('Found product name from other orders:', matchedProductName);
                 
                 // Update the current order with this product name
                 if (matchedProductName && (!storedOrderInfo || !storedOrderInfo.productName)) {
-                  console.log('Setting product name from matched order');
                   setOrder(prev => ({
                     ...prev,
                     productName: matchedProductName
