@@ -43,6 +43,7 @@ const ConfirmationPage: React.FC = () => {
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   const confirmationRef = useRef<HTMLDivElement>(null);
+  const previewCardRef = useRef<HTMLDivElement>(null);
 
   // Handle screen resize to detect mobile
   useEffect(() => {
@@ -267,7 +268,7 @@ const ConfirmationPage: React.FC = () => {
 
   // Function to save confirmation to gallery
   const saveConfirmation = async () => {
-    if (!confirmationRef.current) return;
+    if (!previewCardRef.current) return;
     
     try {
       // Set capturing state to true to show full transaction hash
@@ -276,7 +277,7 @@ const ConfirmationPage: React.FC = () => {
       // Wait for state update to reflect in the DOM
       setTimeout(async () => {
         // Add padding and set background to ensure clean screenshot
-        const canvas = await html2canvas(confirmationRef.current, {
+        const canvas = await html2canvas(previewCardRef.current, {
           backgroundColor: document.body.classList.contains('dark') ? '#25104a' : '#ffffff',
           scale: 2, // Higher quality
           logging: false,
@@ -468,9 +469,8 @@ const ConfirmationPage: React.FC = () => {
             </div>
           </div>
           
-          {/* Link Preview Card */}
-          <div className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4 mb-6">
-            <h3 className="text-white text-lg font-semibold mb-3">Shareable Link Preview</h3>
+          {/* Preview Card for saving to gallery */}
+          <div ref={previewCardRef} className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4 mb-6">
             <div className="flex items-start gap-4">
               <div className="bg-white p-2 rounded-md">
                 <QRCode 
@@ -492,9 +492,6 @@ const ConfirmationPage: React.FC = () => {
                 </div>
               </div>
             </div>
-            <p className="text-xs text-gray-300 mt-3">
-              This is how your order will appear when shared via the verification link
-            </p>
           </div>
           
           <div className="flex flex-col space-y-3">
