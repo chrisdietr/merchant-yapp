@@ -6,6 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { WALLET_ADDRESS } from '../config/yodl';
 import { useAuth } from '@/contexts/AuthContext';
 import yodlService from '../lib/yodl';
+import shopsData from "@/config/shops.json";
 
 // Define the parsed QR data structure
 interface OrderData {
@@ -17,6 +18,18 @@ interface OrderData {
   txHash?: string;
   nonce?: string;
   productName?: string;
+  productId?: string;
+  senderAddress?: string;
+}
+
+interface ProductData {
+  id: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  emoji: string;
+  inStock: boolean | string;
 }
 
 interface OrderScannerProps {
@@ -28,6 +41,7 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
   const [scannedData, setScannedData] = useState<OrderData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [rawScanData, setRawScanData] = useState<string | null>(null);
+  const [productDetails, setProductDetails] = useState<ProductData | null>(null);
   
   // Double-check admin status with AuthContext for security
   const { isAdmin: contextIsAdmin, isAuthenticated } = useAuth();
@@ -51,6 +65,36 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
       console.log('Raw QR Data Received:', rawScanData);
     }
   }, [rawScanData]);
+
+  // Look up product details when scanned data changes
+  useEffect(() => {
+    if (scannedData?.productId) {
+      console.log('Looking up product details for:', scannedData.productId);
+      const product = shopsData.products.find(p => p.id === scannedData.productId);
+      if (product) {
+        console.log('Found product details:', product);
+        setProductDetails(product);
+      } else {
+        console.log('Product not found in shops.json');
+        setProductDetails(null);
+      }
+    } else if (scannedData?.productName) {
+      // Try to find product by name if id is not available
+      console.log('Looking up product by name:', scannedData.productName);
+      const product = shopsData.products.find(
+        p => p.name.toLowerCase() === scannedData.productName?.toLowerCase()
+      );
+      if (product) {
+        console.log('Found product by name:', product);
+        setProductDetails(product);
+      } else {
+        console.log('Product not found by name');
+        setProductDetails(null);
+      }
+    } else {
+      setProductDetails(null);
+    }
+  }, [scannedData]);
 
   const handleScanResult = (result: string) => {
     if (!result) return;
@@ -91,6 +135,8 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
                 txHash: txHash || orderInfo.txHash,
                 timestamp: orderInfo.timestamp || new Date().toISOString(),
                 productName: orderInfo.productName,
+                productId: orderInfo.productId,
+                senderAddress: orderInfo.senderAddress,
                 nonce: orderInfo.nonce
               });
               setScanning(false);
@@ -166,6 +212,8 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
           currency: paymentDetails.currency || paymentDetails.tokenOutSymbol || paymentDetails.invoiceCurrency || 'UNKNOWN',
           txHash,
           timestamp: paymentDetails.timestamp || paymentDetails.blockTimestamp || paymentDetails.created || new Date().toISOString(),
+          productName: paymentDetails.productName,
+          senderAddress: paymentDetails.from || paymentDetails.senderAddress,
         };
         
         // Update scanned data with API data
@@ -190,6 +238,7 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
     setRawScanData(null);
     setError(null);
     setScanning(false);
+    setProductDetails(null);
   };
 
   const startScanning = () => {
@@ -197,6 +246,14 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
     setScannedData(null);
     setRawScanData(null);
     setError(null);
+    setProductDetails(null);
+  };
+
+  // Format wallet address for display
+  const formatAddress = (address?: string) => {
+    if (!address) return '';
+    if (address.length < 10) return address;
+    return `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
   return (
@@ -224,6 +281,24 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
               {scannedData && (
                 <div className="bg-gradient-to-br from-green-900/40 to-green-800/40 p-3 md:p-4 rounded-lg border border-green-400/30 mb-3 md:mb-4 text-white">
                   <h3 className="text-base md:text-lg font-medium text-green-300 mb-2">Order Details</h3>
+                  
+                  {/* Product information with emoji */}
+                  {(productDetails || scannedData.productName) && (
+                    <div className="bg-green-900/40 rounded-md mb-3 p-2 flex items-center gap-2">
+                      <span className="text-2xl">
+                        {productDetails?.emoji || "🛒"}
+                      </span>
+                      <div>
+                        <p className="font-medium text-green-200">
+                          {productDetails?.name || scannedData.productName}
+                        </p>
+                        {productDetails?.description && (
+                          <p className="text-xs text-green-300/70">{productDetails.description}</p>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  
                   <div className="text-xs md:text-sm space-y-1 md:space-y-2">
                     <p><span className="font-semibold">Order ID:</span> {scannedData.orderId}</p>
                     <p><span className="font-semibold">Status:</span> <span className={`px-2 py-0.5 md:py-1 rounded-full text-xs font-medium ${
@@ -233,6 +308,22 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
                     }`}>
                       {scannedData.status.charAt(0).toUpperCase() + scannedData.status.slice(1)}
                     </span></p>
+                    
+                    {/* Buyer's wallet address */}
+                    {scannedData.senderAddress && (
+                      <p>
+                        <span className="font-semibold">Buyer:</span> 
+                        <a
+                          href={`https://yodl.me/address/${scannedData.senderAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-1 text-green-300 hover:text-green-200 hover:underline"
+                        >
+                          {formatAddress(scannedData.senderAddress)}
+                        </a>
+                      </p>
+                    )}
+                    
                     <p><span className="font-semibold">Date:</span> {new Date(scannedData.timestamp).toLocaleString()}</p>
                     {scannedData.amount && scannedData.currency && (
                       <p><span className="font-semibold">Amount:</span> {scannedData.amount} {scannedData.currency}</p>

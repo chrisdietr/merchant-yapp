@@ -40,7 +40,9 @@ export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
         shopInfo: shopsData.shops.length > 0 ? {
           name: shopsData.shops[0].name,
           ownerAddress: shopsData.shops[0].ownerAddress
-        } : undefined
+        } : undefined,
+        // Include emoji for display in the scanner
+        emoji: product.emoji
       })
     : ""
 
@@ -105,7 +107,10 @@ export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
           />
         </div>
         <div className="text-center space-y-1">
-          <p className="font-medium">{product.name}</p>
+          <div className="flex items-center justify-center gap-2 mb-1">
+            <span className="text-2xl">{product.emoji}</span>
+            <p className="font-medium">{product.name}</p>
+          </div>
           <p className="text-xl font-bold">${product.price.toFixed(2)}</p>
         </div>
       </div>
