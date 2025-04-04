@@ -163,10 +163,27 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
             
             // Get stored order data if available
             const orderInfo = yodlService.getOrderInfo(orderId);
-            console.log('Order info from storage:', orderInfo);
+            console.log('Order info from storage (FULL):', JSON.stringify(orderInfo, null, 2));
+            
+            // Try to extract product ID from orderId (if it follows product_ID_timestamp format)
+            let extractedProductId = null;
+            const match = orderId.match(/product_(\d+)_/);
+            if (match && match[1]) {
+              extractedProductId = match[1];
+              console.log('Extracted product ID from order ID:', extractedProductId);
+              
+              // Directly look up the product
+              const foundProduct = shopsData.products.find(p => p.id === extractedProductId);
+              console.log('Found product by extracted ID:', foundProduct);
+              
+              // Force set product details
+              if (foundProduct) {
+                setProductDetails(foundProduct);
+              }
+            }
             
             if (orderInfo) {
-              setScannedData({
+              const orderData = {
                 orderId,
                 status: orderInfo.status || 'pending',
                 amount: orderInfo.amount,
@@ -174,12 +191,16 @@ const OrderScanner: React.FC<OrderScannerProps> = ({ isAdmin }) => {
                 txHash: txHash || orderInfo.txHash,
                 timestamp: orderInfo.timestamp || new Date().toISOString(),
                 productName: orderInfo.productName,
-                productId: orderInfo.productId,
+                productId: orderInfo.productId || extractedProductId, // Use extracted ID if not in storage
                 senderAddress: orderInfo.senderAddress,
                 emoji: orderInfo.emoji,
                 nonce: orderInfo.nonce,
                 name: orderInfo.name || orderInfo.productName
-              });
+              };
+              
+              console.log('FINAL ORDER DATA SET TO STATE:', JSON.stringify(orderData, null, 2));
+              
+              setScannedData(orderData);
               setScanning(false);
               setError(null);
               return;
