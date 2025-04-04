@@ -290,12 +290,12 @@ const ConfirmationPage: React.FC = () => {
       previewCard.style.zIndex = '9999';
       
       // Wait for styles to apply and DOM to update
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 300));
       
       // Capture the now-visible element
       const canvas = await html2canvas(previewCard, {
         backgroundColor: document.body.classList.contains('dark') ? '#25104a' : '#ffffff',
-        scale: 2, // Higher quality
+        scale: 4, // Higher quality (increased from 2)
         logging: true, // Enable logging for troubleshooting
         useCORS: true,
         allowTaint: true,
@@ -315,7 +315,7 @@ const ConfirmationPage: React.FC = () => {
       
       // Create an anchor element to download the image
       const link = document.createElement('a');
-      link.href = canvas.toDataURL('image/png');
+      link.href = canvas.toDataURL('image/png', 1.0); // Use highest quality
       link.download = `order-${order.orderId}.png`;
       document.body.appendChild(link);
       link.click();
@@ -488,31 +488,44 @@ const ConfirmationPage: React.FC = () => {
           {/* Preview card for saving to gallery or sharing - hidden but ready for capture */}
           <div 
             ref={previewCardRef} 
-            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4"
-            style={{ position: 'absolute', left: '-9999px', opacity: '0', width: '350px', height: 'auto' }}
+            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-5"
+            style={{ position: 'absolute', left: '-9999px', opacity: '0', width: '450px', height: 'auto' }}
           >
-            <div className="flex items-start gap-4">
-              <div className="bg-white p-2 rounded-md">
+            <div className="flex flex-col items-center">
+              <div className="bg-white p-3 rounded-md mb-3">
                 <QRCode 
                   value={getOrderQRValue()} 
-                  size={80}
+                  size={120}
                   renderAs="canvas"
                   includeMargin={false}
                 />
+                <p className="text-center text-black text-xs mt-2 font-medium">Order: {order.orderId}</p>
               </div>
-              <div className="flex-1 text-white">
-                <div className="flex items-center mb-2">
-                  <span className="text-2xl mr-2">{getProductEmoji()}</span>
-                  <span className="font-medium">{order.productName || 'Product Order'}</span>
+              
+              <div className="w-full text-white">
+                <div className="flex items-center justify-center mb-3">
+                  <span className="text-3xl mr-2">{getProductEmoji()}</span>
+                  <span className="font-bold text-lg">{(() => {
+                    // Get the product name using the same logic as in the main UI
+                    if (order.productName) {
+                      return order.productName;
+                    }
+                    
+                    if (order.orderId && order.orderId.startsWith('product_')) {
+                      const productId = order.orderId.split('_')[1];
+                      if (productMap[productId]) {
+                        return productMap[productId];
+                      }
+                      return `Product #${productId}`;
+                    }
+                    
+                    return 'Unknown Product';
+                  })()}</span>
                 </div>
-                <div className="text-sm space-y-1">
-                  <p className="text-green-300 font-medium">{order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}</p>
-                  <p className="text-lg font-bold">{formatCurrency(order.amount, order.currency)}</p>
-                  {order.txHash && (
-                    <p className="text-gray-300 text-xs truncate">
-                      Txn: {isCapturing ? order.txHash : `${order.txHash.substring(0, 10)}...`}
-                    </p>
-                  )}
+                
+                <div className="text-center space-y-2">
+                  <p className="text-green-300 font-medium text-lg">{order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}</p>
+                  <p className="text-xl font-bold">{formatCurrency(order.amount, order.currency)}</p>
                   <p className="text-gray-300 text-xs">{new Date(order.timestamp || Date.now()).toLocaleString()}</p>
                 </div>
               </div>
