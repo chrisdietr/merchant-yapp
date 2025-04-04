@@ -492,16 +492,13 @@ const ConfirmationPage: React.FC = () => {
             style={{ position: 'absolute', left: '-9999px', opacity: '0', width: '350px', height: 'auto' }}
           >
             <div className="flex items-start gap-4">
-              <div className="flex flex-col items-center">
-                <div className="bg-white p-2 rounded-md mb-1">
-                  <QRCode 
-                    value={getOrderQRValue()} 
-                    size={80}
-                    renderAs="canvas"
-                    includeMargin={false}
-                  />
-                </div>
-                <p className="text-gray-300 text-xs text-center mt-1">Order #{order.orderId}</p>
+              <div className="bg-white p-2 rounded-md">
+                <QRCode 
+                  value={getOrderQRValue()} 
+                  size={80}
+                  renderAs="canvas"
+                  includeMargin={false}
+                />
               </div>
               <div className="flex-1 text-white">
                 <div className="flex items-center mb-2">
