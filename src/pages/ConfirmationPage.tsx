@@ -271,8 +271,7 @@ const ConfirmationPage: React.FC = () => {
     if (!previewCardRef.current) return;
     
     try {
-      // Set capturing state to true to show full transaction hash
-      setIsCapturing(true);
+      // No longer setting isCapturing to true to prevent showing full hash
       
       // Temporarily make the card visible for capturing
       const previewCard = previewCardRef.current;
@@ -310,8 +309,7 @@ const ConfirmationPage: React.FC = () => {
       previewCard.style.left = originalStyles.left;
       previewCard.style.opacity = originalStyles.opacity;
       
-      // Reset capturing state
-      setIsCapturing(false);
+      // No need to reset isCapturing since we didn't set it
       
       // Create an anchor element to download the image
       const link = document.createElement('a');
@@ -324,7 +322,6 @@ const ConfirmationPage: React.FC = () => {
     } catch (error) {
       console.error('Error saving confirmation:', error);
       alert('Failed to save confirmation');
-      setIsCapturing(false);
     }
   };
 
@@ -343,7 +340,7 @@ const ConfirmationPage: React.FC = () => {
     const shopName = shopInfo?.name || 'your shop';
     const orderLink = getOrderQRValue(); // Use the order verification link instead of txn URL
     
-    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from? Here's the payment confirmation: ${orderLink}`;
+    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from? Order confirmation: ${orderLink}`;
   };
 
   // Find product emoji from productId in the orderId
@@ -354,6 +351,42 @@ const ConfirmationPage: React.FC = () => {
       return product?.emoji || '🛒';
     }
     return '🛒'; // Default shopping cart emoji
+  };
+
+  // Get product name for display
+  const getProductName = () => {
+    // If we have a product name directly, use it
+    if (order.productName) {
+      console.log('Using order.productName:', order.productName);
+      return order.productName;
+    }
+    
+    // Otherwise try to derive it from the order ID
+    if (order.orderId && order.orderId.startsWith('product_')) {
+      const productId = order.orderId.split('_')[1];
+      console.log('Extracted productId from orderId:', productId);
+      
+      // Check if we have a mapping in our product map
+      if (productMap[productId]) {
+        console.log('Found in productMap:', productMap[productId]);
+        return productMap[productId];
+      }
+      
+      // Try to find from shops data
+      const productFromShops = shopsData.products.find((p: any) => p.id === productId);
+      if (productFromShops) {
+        console.log('Found in shopsData:', productFromShops.name);
+        return productFromShops.name;
+      }
+      
+      // Last resort: show a basic name with the product ID
+      console.log('Using fallback product ID name');
+      return `Product #${productId}`;
+    }
+    
+    // Absolute fallback
+    console.log('Using unknown product fallback');
+    return 'Unknown Product';
   };
 
   return (
@@ -417,28 +450,7 @@ const ConfirmationPage: React.FC = () => {
                 <div className="flex items-center gap-2">
                   <span className="text-2xl">{getProductEmoji()}</span>
                   <span className="font-medium text-black dark:text-white">
-                    {(() => {
-                      // If we have a product name directly, use it
-                      if (order.productName) {
-                        return order.productName;
-                      }
-                      
-                      // Otherwise try to derive it from the order ID
-                      if (order.orderId && order.orderId.startsWith('product_')) {
-                        const productId = order.orderId.split('_')[1];
-                        
-                        // Check if we have a mapping in our product map
-                        if (productMap[productId]) {
-                          return productMap[productId];
-                        }
-                        
-                        // Last resort: show a basic name with the product ID
-                        return `Product #${productId}`;
-                      }
-                      
-                      // Absolute fallback
-                      return 'Unknown Product';
-                    })()}
+                    {getProductName()}
                   </span>
                 </div>
               </div>
@@ -485,7 +497,7 @@ const ConfirmationPage: React.FC = () => {
             </div>
           </div>
           
-          {/* Preview card for saving to gallery or sharing - hidden but ready for capture */}
+          {/* Preview card for saving to gallery - simplified, cleaner version */}
           <div 
             ref={previewCardRef} 
             className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4"
@@ -503,30 +515,7 @@ const ConfirmationPage: React.FC = () => {
               <div className="flex-1 text-white">
                 <div className="flex items-center mb-2">
                   <span className="text-2xl mr-2">{getProductEmoji()}</span>
-                  <span className="font-medium">
-                    {(() => {
-                      // If we have a product name directly, use it
-                      if (order.productName) {
-                        return order.productName;
-                      }
-                      
-                      // Otherwise try to derive it from the order ID
-                      if (order.orderId && order.orderId.startsWith('product_')) {
-                        const productId = order.orderId.split('_')[1];
-                        
-                        // Check if we have a mapping in our product map
-                        if (productMap[productId]) {
-                          return productMap[productId];
-                        }
-                        
-                        // Last resort: show a basic name with the product ID
-                        return `Product #${productId}`;
-                      }
-                      
-                      // Absolute fallback
-                      return 'Unknown Product';
-                    })()}
-                  </span>
+                  <span className="font-medium">{getProductName()}</span>
                 </div>
                 <div className="text-sm space-y-1">
                   <p className="text-green-300 font-medium">{order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}</p>
