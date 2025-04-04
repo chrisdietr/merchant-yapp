@@ -3,12 +3,12 @@ import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { useAccount } from "wagmi"
 import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "./ui/button"
-import { Link, useLocation } from "react-router-dom"
+import { Link, useLocation, Outlet } from "react-router-dom"
 import { useState, useEffect } from "react"
 import { Menu, X } from "lucide-react"
 
 interface LayoutProps {
-  children: React.ReactNode
+  children?: React.ReactNode
 }
 
 export function Layout({ children }: LayoutProps) {
@@ -173,7 +173,9 @@ export function Layout({ children }: LayoutProps) {
           </div>
         )}
       </header>
-      <main className="container py-6 px-4 md:py-8 md:px-6">{children}</main>
+      <main className="container py-6 px-4 md:py-8 md:px-6">
+        {children || <Outlet />}
+      </main>
     </div>
   )
 }

@@ -11,6 +11,7 @@ import ConfirmationPage from "@/pages/ConfirmationPage";
 import ProductPage from "@/pages/ProductPage";
 import AdminScannerPage from "@/pages/AdminScannerPage";
 import VerifyPage from "@/pages/VerifyPage";
+import SocialPreviewImage from "@/pages/SocialPreviewImage";
 import Login from "@/pages/Login";
 import NotFound from "@/pages/NotFound";
 import { Toaster } from "@/components/ui/toaster";
@@ -28,8 +29,12 @@ export default function App() {
             <AuthProvider>
               <Toaster />
               <Router>
-                <Layout>
-                  <Routes>
+                <Routes>
+                  {/* Special route for social media previews - no layout */}
+                  <Route path="/social-preview/:orderId/:txHash?" element={<SocialPreviewImage />} />
+                  
+                  {/* All other routes wrapped in Layout */}
+                  <Route element={<Layout />}>
                     <Route path="/" element={<Index />} />
                     <Route path="/payment" element={<Payment />} />
                     <Route path="/yodl" element={<YodlPaymentPage />} />
@@ -46,8 +51,8 @@ export default function App() {
                     />
                     <Route path="/login" element={<Login />} />
                     <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Layout>
+                  </Route>
+                </Routes>
               </Router>
             </AuthProvider>
           </RainbowKitProvider>

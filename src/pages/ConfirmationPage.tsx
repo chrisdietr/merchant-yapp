@@ -43,14 +43,24 @@ const ConfirmationPage: React.FC = () => {
   const [shopInfo, setShopInfo] = useState<any>(null);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [socialPreviewUrl, setSocialPreviewUrl] = useState<string>('');
   const confirmationRef = useRef<HTMLDivElement>(null);
   const previewCardRef = useRef<HTMLDivElement>(null);
+  const socialPreviewRef = useRef<HTMLDivElement>(null);
 
   // Handle screen resize to detect mobile
   useEffect(() => {
-    const checkIsMobile = () => setIsMobile(window.innerWidth < 768);
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    // Check initially
     checkIsMobile();
+    
+    // Listen for resize events
     window.addEventListener('resize', checkIsMobile);
+    
+    // Cleanup
     return () => window.removeEventListener('resize', checkIsMobile);
   }, []);
 
@@ -68,21 +78,39 @@ const ConfirmationPage: React.FC = () => {
     // Initialize orderInfo with data from localStorage
     const storedOrderInfo = yodlService.getOrderInfo(orderId);
     
+    // DEBUG: Directly check all orders in localStorage
+    try {
+      const allOrders = localStorage.getItem('yodl_orders');
+      console.log('All orders in localStorage:', allOrders ? JSON.parse(allOrders) : 'No orders found');
+    } catch (e) {
+      console.error('Error parsing localStorage orders:', e);
+    }
+    
+    // Debug logging to identify issue
+    console.log('Order ID:', orderId);
+    console.log('Stored order info:', storedOrderInfo);
+    console.log('Product map:', productMap);
+    
     // Extract product ID from order ID (format: product_ID_TIMESTAMP)
     let productId = '';
     let foundProductName = '';
     
-    if (orderId && orderId.startsWith('product_')) {
+    if (orderId) {
       const parts = orderId.split('_');
       if (parts.length >= 2 && parts[0] === 'product') {
         productId = parts[1];
+        console.log('Product ID extracted:', productId);
         
         // Check if we have this product in our map
         if (productMap[productId]) {
           foundProductName = productMap[productId];
+          console.log('Found product name from product map:', foundProductName);
         }
       }
     }
+    
+    // For testing, explicitly check if we have products in shopsData
+    console.log('Available products in shops data:', shopsData.products);
     
     // Check if this looks like a product order ID
     if (orderId && orderId.startsWith('product_')) {
@@ -90,6 +118,7 @@ const ConfirmationPage: React.FC = () => {
       try {
         // First try product map
         if (foundProductName) {
+          console.log('Using product name from product map:', foundProductName);
           setOrder(prev => ({
             ...prev,
             productName: foundProductName
@@ -98,6 +127,7 @@ const ConfirmationPage: React.FC = () => {
           // Check shops.json directly for this product ID
           const productFromShops = shopsData.products.find((p: any) => p.id === productId);
           if (productFromShops) {
+            console.log('Found product directly in shops.json:', productFromShops.name);
             setOrder(prev => ({
               ...prev,
               productName: productFromShops.name
@@ -112,13 +142,16 @@ const ConfirmationPage: React.FC = () => {
               const matchingOrders = Object.values(parsedOrders).filter((order: any) => 
                 order.productName && order.orderId && order.orderId.includes(`product_${productId}`)
               );
+              console.log('Matching orders with same product ID:', matchingOrders);
               
               if (matchingOrders.length > 0) {
                 // Use the product name from the first matching order
                 const matchedProductName = (matchingOrders[0] as any).productName;
+                console.log('Found product name from other orders:', matchedProductName);
                 
                 // Update the current order with this product name
                 if (matchedProductName && (!storedOrderInfo || !storedOrderInfo.productName)) {
+                  console.log('Setting product name from matched order');
                   setOrder(prev => ({
                     ...prev,
                     productName: matchedProductName
@@ -305,7 +338,13 @@ const ConfirmationPage: React.FC = () => {
   };
 
   // Get the order QR code value - includes transaction hash if available
-  const getOrderQRValue = () => window.location.origin + `/verify/${order.orderId}${order.txHash ? `/${order.txHash}` : ''}`;
+  const getOrderQRValue = () => {
+    const baseUrl = window.location.origin;
+    if (order.txHash) {
+      return `${baseUrl}/verify/${order.orderId}/${order.txHash}`;
+    }
+    return `${baseUrl}/verify/${order.orderId}`;
+  };
   
   // Generate the Telegram message with order details
   const getTelegramMessage = () => {
@@ -432,6 +471,68 @@ const ConfirmationPage: React.FC = () => {
     return null;
   };
 
+  // Function to generate social preview image URL - now dynamically creates an image
+  const generateSocialPreviewImage = async () => {
+    if (!socialPreviewRef.current || loading) {
+      return '';
+    }
+    
+    try {
+      // Make the social preview visible temporarily for capturing
+      const previewElement = socialPreviewRef.current;
+      const originalStyles = {
+        position: previewElement.style.position,
+        visibility: previewElement.style.visibility,
+        opacity: previewElement.style.opacity
+      };
+      
+      // Position offscreen but fully render
+      previewElement.style.position = 'fixed';
+      previewElement.style.left = '-9999px';
+      previewElement.style.top = '0';
+      previewElement.style.opacity = '1';
+      previewElement.style.visibility = 'visible';
+      previewElement.style.pointerEvents = 'none';
+      
+      // Wait for rendering
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Generate image
+      const canvas = await html2canvas(previewElement, {
+        backgroundColor: '#25104a',
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        allowTaint: true
+      });
+      
+      // Reset styles
+      previewElement.style.position = originalStyles.position;
+      previewElement.style.visibility = originalStyles.visibility;
+      previewElement.style.opacity = originalStyles.opacity;
+      
+      // Get data URL
+      const dataUrl = canvas.toDataURL('image/png');
+      return dataUrl;
+    } catch (error) {
+      console.error('Error generating social preview:', error);
+      return '';
+    }
+  };
+
+  // Generate and set the social preview image when order loads
+  useEffect(() => {
+    // Only run this when loading is complete and we have order data
+    if (!loading && order.orderId !== 'unknown') {
+      // Generate the preview image asynchronously
+      generateSocialPreviewImage().then(imageUrl => {
+        if (imageUrl) {
+          setSocialPreviewUrl(imageUrl);
+        }
+      });
+    }
+  }, [loading, order.orderId, order.status]);
+
   // Function to get social media preview title
   const getSocialPreviewTitle = () => {
     const productName = getProductName();
@@ -466,21 +567,9 @@ const ConfirmationPage: React.FC = () => {
     return `${productName} purchased from ${shopName} for ${amount}. Order ID: ${order.orderId}. ${order.status === 'completed' ? 'Payment confirmed on ' : 'Payment pending as of '} ${date}.`;
   };
 
-  // Add function to generate dynamic image URL for social sharing
-  const getDynamicImageUrl = () => {
-    const productName = encodeURIComponent(getProductName());
-    const emoji = encodeURIComponent(getProductEmoji());
-    const amount = encodeURIComponent(formatCurrency(order.amount, order.currency));
-    const status = encodeURIComponent(order.status === 'completed' ? 'Payment Confirmed' : 'Payment Pending');
-    
-    // Use a dynamic image generation service (ogimage.vercel.app or similar)
-    // This constructs a URL that will return an image when visited
-    return `https://og-image.vercel.app/**${emoji}%20${productName}**.png?theme=dark&md=1&fontSize=100px&images=https%3A%2F%2Fassets.vercel.com%2Fimage%2Fupload%2Ffront%2Fassets%2Fdesign%2Fvercel-triangle-white.svg&images=https%3A%2F%2Fyodl.me%2Ficon.png&widths=350&heights=350&caption=${status}&txtcolor=purple&bgGradient=true&bgColor=%2325104a&bgSecondaryColor=%2310021e&subtitleColor=green&descriptionColor=rgba(255%2C255%2C255%2C0.7)&desc=${amount}`;
-  };
-
   return (
     <div className="max-w-lg mx-auto px-4 py-4 md:py-8">
-      {/* Dynamic meta tags for social sharing */}
+      {/* Add social media preview metadata */}
       <Helmet>
         <title>{getSocialPreviewTitle()}</title>
         <meta name="description" content={getSocialPreviewDescription()} />
@@ -490,9 +579,7 @@ const ConfirmationPage: React.FC = () => {
         <meta property="og:url" content={window.location.href} />
         <meta property="og:title" content={getSocialPreviewTitle()} />
         <meta property="og:description" content={getSocialPreviewDescription()} />
-        
-        {/* Use a dynamically generated image URL based on order details */}
-        <meta property="og:image" content={getDynamicImageUrl()} />
+        {socialPreviewUrl && <meta property="og:image" content={socialPreviewUrl} />}
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         
@@ -501,27 +588,7 @@ const ConfirmationPage: React.FC = () => {
         <meta name="twitter:url" content={window.location.href} />
         <meta name="twitter:title" content={getSocialPreviewTitle()} />
         <meta name="twitter:description" content={getSocialPreviewDescription()} />
-        <meta name="twitter:image" content={getDynamicImageUrl()} />
-
-        {/* Product-specific structured data for SEO */}
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Order",
-            "orderNumber": order.orderId,
-            "orderStatus": order.status === 'completed' ? "OrderDelivered" : "OrderProcessing",
-            "priceCurrency": order.currency,
-            "price": order.amount.toString(),
-            "orderDate": order.timestamp ? new Date(order.timestamp).toISOString() : new Date().toISOString(),
-            "acceptedOffer": {
-              "@type": "Offer",
-              "itemOffered": {
-                "@type": "Product",
-                "name": getProductName()
-              }
-            }
-          })}
-        </script>
+        {socialPreviewUrl && <meta name="twitter:image" content={socialPreviewUrl} />}
       </Helmet>
       
       <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Order Confirmation</h1>
@@ -542,35 +609,35 @@ const ConfirmationPage: React.FC = () => {
         <>
           <div ref={confirmationRef} className="bg-white dark:bg-card border rounded-lg shadow-sm p-4 md:p-6 mb-4 md:mb-6">
             <div className="text-center mb-4 md:mb-6">
-              {order.status === 'completed' ? (
-                <div className="text-green-500 mb-2">
+            {order.status === 'completed' ? (
+              <div className="text-green-500 mb-2">
                   <svg className="w-12 h-12 md:w-16 md:h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
-                  </svg>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7"></path>
+                </svg>
                   <h2 className="text-lg md:text-xl font-semibold text-black dark:text-white">Payment Confirmed</h2>
-                </div>
-              ) : (
-                <div className="text-yellow-500 mb-2">
+              </div>
+            ) : (
+              <div className="text-yellow-500 mb-2">
                   <svg className="w-12 h-12 md:w-16 md:h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                  </svg>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
                   <h2 className="text-lg md:text-xl font-semibold text-black dark:text-white">Payment Pending</h2>
-                </div>
-              )}
-            </div>
-            
+              </div>
+            )}
+          </div>
+          
             <div className="mb-4 md:mb-6 flex justify-center">
-              <QRCode 
-                value={getOrderQRValue()} 
+            <QRCode 
+              value={getOrderQRValue()} 
                 size={isMobile ? 140 : 180} 
-                renderAs="canvas"
-                includeMargin={true}
-                className="border rounded p-2"
-              />
-            </div>
-            
+              renderAs="canvas"
+              includeMargin={true}
+              className="border rounded p-2"
+            />
+          </div>
+          
             <div className="space-y-2 md:space-y-3 mb-4 md:mb-6 text-sm md:text-base">
-              <div className="flex justify-between">
+            <div className="flex justify-between">
                 <span className="text-black dark:text-foreground/70">Order ID:</span>
                 <span className="font-medium text-black dark:text-white">
                   {order.orderId}
@@ -586,43 +653,43 @@ const ConfirmationPage: React.FC = () => {
                     {getProductName()}
                   </span>
                 </div>
-              </div>
-              
-              {/* Transaction hash moved below Order ID */}
-              {order.txHash && (
-                <div className="flex justify-between items-center">
+            </div>
+            
+            {/* Transaction hash moved below Order ID */}
+            {order.txHash && (
+              <div className="flex justify-between items-center">
                   <span className="text-black dark:text-foreground/70">Transaction:</span>
                   {isCapturing ? (
                     <span className="font-medium text-blue-500 break-all text-xs">
                       {order.txHash}
                     </span>
                   ) : (
-                    <a 
-                      href={`https://yodl.me/tx/${order.txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                <a 
+                  href={`https://yodl.me/tx/${order.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                       className="text-blue-500 hover:underline font-medium truncate max-w-[150px] md:max-w-[200px]"
-                    >
+                >
                       {order.txHash.substring(0, 8)}...
-                    </a>
+                </a>
                   )}
-                </div>
-              )}
-              
-              <div className="flex justify-between">
+              </div>
+            )}
+            
+            <div className="flex justify-between">
                 <span className="text-black dark:text-foreground/70">Amount:</span>
                 <span className="font-medium text-black dark:text-white">{formatCurrency(order.amount, order.currency)}</span>
-              </div>
-              
-              <div className="flex justify-between">
+            </div>
+            
+            <div className="flex justify-between">
                 <span className="text-black dark:text-foreground/70">Status:</span>
-                <span className={`font-medium ${order.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
-                  {order.status === 'completed' ? 'Confirmed' : 'Pending'}
-                </span>
-              </div>
-              
-              {order.timestamp && (
-                <div className="flex justify-between">
+              <span className={`font-medium ${order.status === 'completed' ? 'text-green-600' : 'text-yellow-600'}`}>
+                {order.status === 'completed' ? 'Confirmed' : 'Pending'}
+              </span>
+            </div>
+            
+            {order.timestamp && (
+              <div className="flex justify-between">
                   <span className="text-black dark:text-foreground/70">Timestamp:</span>
                   <span className="font-medium text-black dark:text-white">{new Date(order.timestamp).toLocaleString()}</span>
                 </div>
@@ -676,15 +743,15 @@ const ConfirmationPage: React.FC = () => {
                 return (
                   <a 
                     href={generateTelegramLink(telegramHandle, getTelegramMessage())}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full"
-                  >
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full"
+              >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="#fff">
                       <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.079l-1.702 8.493c-.127.617-.492.864-1 .539l-2.766-2.04-1.336 1.285c-.148.148-.272.272-.56.272l.2-2.834 5.152-4.651c.225-.196-.049-.308-.345-.112l-6.37 4.009-2.744-.912c-.594-.185-.604-.592.128-.878l10.728-4.136c.494-.179.927.108.765.965z"/>
-                    </svg>
-                    Contact Seller on Telegram
-                  </a>
+                </svg>
+                Contact Seller on Telegram
+              </a>
                 );
               }
               return null;
@@ -697,7 +764,7 @@ const ConfirmationPage: React.FC = () => {
               
               <Button onClick={copySocialShareLink} variant="secondary" className="flex-1">
                 Copy Share Link
-              </Button>
+            </Button>
             </div>
             
             <Link to="/">
@@ -706,6 +773,57 @@ const ConfirmationPage: React.FC = () => {
               </Button>
             </Link>
           </div>
+
+          {/* Hidden element for social media preview image generation - matched to gallery save style but optimized for social */}
+          <div 
+            ref={socialPreviewRef} 
+            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-8"
+            style={{ 
+              position: 'absolute', 
+              left: '-9999px', 
+              visibility: 'hidden',
+              width: '1200px', 
+              height: '630px'
+            }}
+          >
+            <div className="flex items-center justify-center h-full">
+              <div className="flex items-start gap-6 max-w-4xl">
+                <div className="bg-white p-4 rounded-md">
+                  <QRCode 
+                    value={getOrderQRValue()} 
+                    size={180}
+                    renderAs="canvas"
+                    includeMargin={false}
+                  />
+                </div>
+                <div className="flex-1 text-white">
+                  <div className="flex items-center">
+                    <span className="text-6xl mr-4">{getProductEmoji()}</span>
+                    <div>
+                      <h1 className="font-bold text-4xl">{getProductName()}</h1>
+                      <p className="text-3xl mt-2 opacity-80">Order #{order.orderId.split('_').pop()}</p>
+                    </div>
+                  </div>
+                  
+                  <p className="text-green-300 font-medium text-3xl mt-6">
+                    {order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}
+                  </p>
+                  
+                  <p className="text-6xl font-bold mt-4">
+                    {formatCurrency(order.amount, order.currency)}
+                  </p>
+                  
+                  <p className="text-gray-300 text-2xl mt-4">
+                    {new Date(order.timestamp || Date.now()).toLocaleString()}
+                  </p>
+                  
+                  <p className="text-gray-300 text-2xl mt-6">
+                    merchant-yapp.lovable.app
+                  </p>
+                </div>
+              </div>
+          </div>
+        </div>
         </>
       )}
     </div>
