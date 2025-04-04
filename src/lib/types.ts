@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string
   name: string
@@ -11,4 +12,14 @@ export interface Product {
 
 export interface ShopData {
   products: Product[]
+}
+
+export interface Shop {
+  ownerAddress: string;
+  name: string;
+  telegramHandle: string;
+  contactInfo?: {
+    email?: string;
+    phone?: string;
+  };
 }

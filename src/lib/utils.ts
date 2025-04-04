@@ -1,19 +1,11 @@
+
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import shopsData from "@/config/shops.json"
+import { Shop } from "./types"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
-}
-
-interface Shop {
-  ownerAddress: string;
-  name: string;
-  telegramHandle: string;
-  contactInfo?: {
-    email: string;
-    phone: string;
-  };
 }
 
 /**

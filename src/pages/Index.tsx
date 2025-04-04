@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react"
 import { ProductCard } from "@/components/ProductCard"
 import { Button } from "@/components/ui/button"
@@ -16,7 +17,8 @@ export default function Index() {
   useEffect(() => {
     const loadProducts = async () => {
       try {
-        setProducts(shopsData.products)
+        // Cast products to match the expected type
+        setProducts(shopsData.products as Product[])
       } catch (error) {
         console.error("Error loading products:", error)
       }

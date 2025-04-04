@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react"
 import { QRCodeSVG } from "qrcode.react"
 import { Button } from "@/components/ui/button"
 import { useNavigate } from "react-router-dom"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Check, DollarSign, Clock } from "lucide-react"
 import shopsData from "@/config/shops.json"
 import { useAuth } from "@/contexts/AuthContext"
 import { Helmet } from "react-helmet"
@@ -82,56 +82,67 @@ export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
   // Generate social preview image when product loads
   useEffect(() => {
     if (product && socialPreviewRef.current) {
-      generateSocialPreviewImage().then(url => {
-        if (url) {
-          setSocialPreviewUrl(url)
-        }
-      })
+      // Small delay to ensure the DOM is fully rendered
+      const timer = setTimeout(() => {
+        generateSocialPreviewImage().then(url => {
+          if (url) {
+            console.log("Social preview image generated successfully")
+            setSocialPreviewUrl(url)
+          } else {
+            console.error("Failed to generate social preview image")
+          }
+        }).catch(err => {
+          console.error("Error generating social preview:", err)
+        })
+      }, 500)
+      
+      return () => clearTimeout(timer)
     }
   }, [product])
 
   // Function to generate social preview image URL
   const generateSocialPreviewImage = async () => {
     if (!socialPreviewRef.current || !product) {
+      console.error("Missing ref or product for social preview generation")
       return '';
     }
     
     try {
       // Make the social preview visible temporarily for capturing
       const previewElement = socialPreviewRef.current;
-      const originalStyles = {
-        position: previewElement.style.position,
-        visibility: previewElement.style.visibility,
-        opacity: previewElement.style.opacity
-      };
       
-      // Position offscreen but fully render
-      previewElement.style.position = 'fixed';
-      previewElement.style.left = '-9999px';
-      previewElement.style.top = '0';
-      previewElement.style.opacity = '1';
-      previewElement.style.visibility = 'visible';
-      previewElement.style.pointerEvents = 'none';
+      // Clone the element to avoid modifying the actual DOM
+      const clone = previewElement.cloneNode(true) as HTMLDivElement;
+      document.body.appendChild(clone);
       
-      // Wait for rendering
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Position and style for capture
+      clone.style.position = 'fixed';
+      clone.style.left = '0';
+      clone.style.top = '0';
+      clone.style.width = '1200px';
+      clone.style.height = '630px';
+      clone.style.opacity = '1';
+      clone.style.visibility = 'visible';
+      clone.style.zIndex = '-1000';
+      clone.style.pointerEvents = 'none';
+      
+      console.log("Attempting to capture social preview with html2canvas")
       
       // Generate image
-      const canvas = await html2canvas(previewElement, {
+      const canvas = await html2canvas(clone, {
         backgroundColor: '#25104a',
         scale: 2,
-        logging: false,
+        logging: true,
         useCORS: true,
         allowTaint: true
       });
       
-      // Reset styles
-      previewElement.style.position = originalStyles.position;
-      previewElement.style.visibility = originalStyles.visibility;
-      previewElement.style.opacity = originalStyles.opacity;
+      // Remove the clone
+      document.body.removeChild(clone);
       
       // Get data URL
       const dataUrl = canvas.toDataURL('image/png');
+      console.log("Successfully generated social preview image")
       return dataUrl;
     } catch (error) {
       console.error('Error generating social preview:', error);
@@ -229,7 +240,8 @@ export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
           left: '-9999px', 
           visibility: 'hidden',
           width: '1200px', 
-          height: '630px'
+          height: '630px',
+          overflow: 'hidden'
         }}
       >
         <div className="flex items-center justify-center h-full">
@@ -251,17 +263,17 @@ export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
                 </div>
               </div>
               
-              <p className="text-green-300 font-medium text-3xl mt-6">
-                ✓ Payment Confirmation
-              </p>
+              <div className="flex items-center text-green-300 font-medium text-3xl mt-6">
+                <Check className="mr-2 h-8 w-8" /> Payment Confirmation
+              </div>
               
-              <p className="text-6xl font-bold mt-4">
-                ${product.price.toFixed(2)} {product.currency}
-              </p>
+              <div className="flex items-center text-6xl font-bold mt-4">
+                <DollarSign className="h-10 w-10 mr-2" />{product.price.toFixed(2)} {product.currency}
+              </div>
               
-              <p className="text-gray-300 text-2xl mt-4">
-                {new Date().toLocaleString()}
-              </p>
+              <div className="flex items-center text-gray-300 text-2xl mt-4">
+                <Clock className="h-6 w-6 mr-2" /> {new Date().toLocaleString()}
+              </div>
               
               <p className="text-gray-300 text-2xl mt-6">
                 merchant-yapp.lovable.app
