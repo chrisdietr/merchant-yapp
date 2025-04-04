@@ -24,17 +24,32 @@
     <script>
       // This script dynamically updates meta tags for social media preview
       function updateMetaTags() {
-        // Check if we're on a confirmation page
-        if (window.location.pathname.includes('/confirmation/')) {
-          console.log('Detected confirmation page - updating meta tags');
+        // Check if we're on a confirmation or verify page
+        if (window.location.pathname.includes('/confirmation/') || window.location.pathname.includes('/verify/')) {
+          console.log('Detected order page - updating meta tags', window.location.pathname);
           
-          // Extract order ID and amount
+          // Extract order ID and transaction hash
           const pathParts = window.location.pathname.split('/');
-          const orderId = pathParts[pathParts.length - 1];
+          let orderId = '';
+          let txHash = '';
+          
+          // Parse different path formats
+          if (window.location.pathname.includes('/confirmation/')) {
+            orderId = pathParts[pathParts.length - 1];
+          } else if (window.location.pathname.includes('/verify/')) {
+            if (pathParts.length >= 3) {
+              orderId = pathParts[pathParts.length - 2];
+              if (pathParts.length >= 4) {
+                txHash = pathParts[pathParts.length - 1];
+              }
+            }
+          }
+          
           const urlParams = new URLSearchParams(window.location.search);
           const amount = urlParams.get('amount');
           
           console.log('Order ID:', orderId);
+          console.log('Transaction Hash:', txHash);
           console.log('Amount:', amount);
           
           // Generate dynamic title and description
@@ -74,6 +89,8 @@
           // Generate absolute URLs
           const baseUrl = window.location.origin;
           const currentPageUrl = window.location.href;
+          
+          // Ensure correct separator when constructing the social preview URL
           const socialPreviewUrl = `${baseUrl}/social-preview/${orderId}`;
           
           console.log('Title:', title);
