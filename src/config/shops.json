@@ -12,7 +12,7 @@
       "name": "Shirt",
       "description": "Available in sizes S, M, L, XL, XXL",
       "price": 0.1,
-      "currency": "BRL",
+      "currency": "USD",
       "emoji": "👕",
       "inStock": true
     },
@@ -30,7 +30,7 @@
       "name": "Beer",
       "description": "Infinite stock.",
       "price": 0.69,
-      "currency": "BRL",
+      "currency": "ARS",
       "emoji": "🍺",
       "inStock": "true"
     }
