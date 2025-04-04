@@ -24,33 +24,31 @@
     <script>
       // This script dynamically updates meta tags for social media preview
       function updateMetaTags() {
+        const currentPath = window.location.pathname;
+        let orderId = null;
+        
         // Check if we're on a confirmation or verify page
-        if (window.location.pathname.includes('/confirmation/') || window.location.pathname.includes('/verify/')) {
-          console.log('Detected order page - updating meta tags', window.location.pathname);
+        if (currentPath.includes('/confirmation/') || currentPath.includes('/verify/')) {
+          console.log(`Detected ${currentPath.includes('/confirmation/') ? 'confirmation' : 'verify'} page - updating meta tags`);
           
-          // Extract order ID and transaction hash
-          const pathParts = window.location.pathname.split('/');
-          let orderId = '';
-          let txHash = '';
+          // Extract order ID based on path structure
+          const pathParts = currentPath.split('/');
+          if (currentPath.includes('/confirmation/')) {
+            orderId = pathParts[pathParts.length - 1]; // /confirmation/:orderId
+          } else if (currentPath.includes('/verify/')) {
+            orderId = pathParts[pathParts.length - 2]; // /verify/:orderId/:txHash?
+          }
           
-          // Parse different path formats
-          if (window.location.pathname.includes('/confirmation/')) {
-            orderId = pathParts[pathParts.length - 1];
-          } else if (window.location.pathname.includes('/verify/')) {
-            if (pathParts.length >= 3) {
-              orderId = pathParts[pathParts.length - 2];
-              if (pathParts.length >= 4) {
-                txHash = pathParts[pathParts.length - 1];
-              }
-            }
+          if (!orderId) {
+            console.error('Could not extract orderId from path:', currentPath);
+            return;
           }
           
           const urlParams = new URLSearchParams(window.location.search);
-          const amount = urlParams.get('amount');
+          const amount = urlParams.get('amount'); // Amount might only be on confirmation URL
           
           console.log('Order ID:', orderId);
-          console.log('Transaction Hash:', txHash);
-          console.log('Amount:', amount);
+          console.log('Amount (from URL):', amount);
           
           // Generate dynamic title and description
           let productName = "Product";
@@ -82,15 +80,14 @@
             }
           }
           
-          // Update meta tags with new format requested by user
+          // Update meta tags with the correct format
           const title = `Purchase confirmed ✅`;
           const description = `Just bought ${productName} from ${shopName}`;
           
           // Generate absolute URLs
           const baseUrl = window.location.origin;
           const currentPageUrl = window.location.href;
-          
-          // Ensure correct separator when constructing the social preview URL
+          // Always point the image to the social-preview route with the orderId
           const socialPreviewUrl = `${baseUrl}/social-preview/${orderId}`;
           
           console.log('Title:', title);
@@ -101,52 +98,22 @@
           document.title = title;
           document.querySelector('meta[name="description"]').setAttribute('content', description);
           
-          // Open Graph
-          document.getElementById('og-title').setAttribute('content', title);
-          document.getElementById('og-description').setAttribute('content', description);
-          document.getElementById('og-url').setAttribute('content', currentPageUrl);
-          document.getElementById('og-image').setAttribute('content', socialPreviewUrl);
+          // Update specific meta tags by ID
+          const ogTitle = document.getElementById('og-title');
+          const ogDescription = document.getElementById('og-description');
+          const ogUrl = document.getElementById('og-url');
+          const ogImage = document.getElementById('og-image');
+          const twitterTitle = document.getElementById('twitter-title');
+          const twitterDescription = document.getElementById('twitter-description');
+          const twitterImage = document.getElementById('twitter-image');
           
-          // Twitter
-          document.getElementById('twitter-title').setAttribute('content', title);
-          document.getElementById('twitter-description').setAttribute('content', description);
-          document.getElementById('twitter-image').setAttribute('content', socialPreviewUrl);
-          
-          // Also directly update meta tags that might have different names
-          const metaTags = document.getElementsByTagName('meta');
-          for (let i = 0; i < metaTags.length; i++) {
-            const tag = metaTags[i];
-            
-            // Update any property="og:title" tags
-            if (tag.getAttribute('property') === 'og:title') {
-              tag.setAttribute('content', title);
-            }
-            
-            // Update any property="og:description" tags
-            if (tag.getAttribute('property') === 'og:description') {
-              tag.setAttribute('content', description);
-            }
-            
-            // Update any property="og:image" tags
-            if (tag.getAttribute('property') === 'og:image') {
-              tag.setAttribute('content', socialPreviewUrl);
-            }
-            
-            // Update any name="twitter:title" tags
-            if (tag.getAttribute('name') === 'twitter:title') {
-              tag.setAttribute('content', title);
-            }
-            
-            // Update any name="twitter:description" tags
-            if (tag.getAttribute('name') === 'twitter:description') {
-              tag.setAttribute('content', description);
-            }
-            
-            // Update any name="twitter:image" tags
-            if (tag.getAttribute('name') === 'twitter:image') {
-              tag.setAttribute('content', socialPreviewUrl);
-            }
-          }
+          if (ogTitle) ogTitle.setAttribute('content', title);
+          if (ogDescription) ogDescription.setAttribute('content', description);
+          if (ogUrl) ogUrl.setAttribute('content', currentPageUrl);
+          if (ogImage) ogImage.setAttribute('content', socialPreviewUrl);
+          if (twitterTitle) twitterTitle.setAttribute('content', title);
+          if (twitterDescription) twitterDescription.setAttribute('content', description);
+          if (twitterImage) twitterImage.setAttribute('content', socialPreviewUrl);
           
           console.log('Meta tags updated successfully');
         }
@@ -158,8 +125,10 @@
       
       // Also run when URL changes (for SPA behavior)
       window.addEventListener('popstate', updateMetaTags);
+      // Re-run after navigation event for SPA routers that don't trigger popstate reliably
+      window.addEventListener('locationchange', updateMetaTags);
       
-      // Additional fallback - run after a short delay to ensure all tags are loaded
+      // Additional fallback - run after a short delay 
       setTimeout(updateMetaTags, 500);
     </script>
   </head>
