@@ -274,37 +274,53 @@ const ConfirmationPage: React.FC = () => {
       // Set capturing state to true to show full transaction hash
       setIsCapturing(true);
       
-      // Wait for state update to reflect in the DOM
-      setTimeout(async () => {
-        // Add padding and set background to ensure clean screenshot
-        const canvas = await html2canvas(previewCardRef.current, {
-          backgroundColor: document.body.classList.contains('dark') ? '#25104a' : '#ffffff',
-          scale: 2, // Higher quality
-          logging: false,
-          useCORS: true
-        });
-        
-        // Reset capturing state
-        setIsCapturing(false);
-        
-        // Create an anchor element to download the image
-        const link = document.createElement('a');
-        
-        // Set the image data as the href
-        link.href = canvas.toDataURL('image/png');
-        
-        // Set the download filename
-        link.download = `order-${order.orderId}.png`;
-        
-        // Append to the document
-        document.body.appendChild(link);
-        
-        // Trigger the download
-        link.click();
-        
-        // Clean up
-        document.body.removeChild(link);
-      }, 100);
+      // Temporarily make the card visible for capturing
+      const previewCard = previewCardRef.current;
+      const originalStyles = {
+        position: previewCard.style.position,
+        left: previewCard.style.left,
+        opacity: previewCard.style.opacity
+      };
+      
+      // Make it visible in the DOM but below the fold
+      previewCard.style.position = 'fixed';
+      previewCard.style.left = '0';
+      previewCard.style.top = '100vh';  // Position it just below the viewport
+      previewCard.style.opacity = '1';
+      previewCard.style.zIndex = '9999';
+      
+      // Wait for styles to apply and DOM to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Capture the now-visible element
+      const canvas = await html2canvas(previewCard, {
+        backgroundColor: document.body.classList.contains('dark') ? '#25104a' : '#ffffff',
+        scale: 2, // Higher quality
+        logging: true, // Enable logging for troubleshooting
+        useCORS: true,
+        allowTaint: true,
+        ignoreElements: (element) => {
+          // Don't ignore any elements
+          return false;
+        }
+      });
+      
+      // Reset original styles
+      previewCard.style.position = originalStyles.position;
+      previewCard.style.left = originalStyles.left;
+      previewCard.style.opacity = originalStyles.opacity;
+      
+      // Reset capturing state
+      setIsCapturing(false);
+      
+      // Create an anchor element to download the image
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `order-${order.orderId}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
     } catch (error) {
       console.error('Error saving confirmation:', error);
       alert('Failed to save confirmation');
@@ -469,11 +485,11 @@ const ConfirmationPage: React.FC = () => {
             </div>
           </div>
           
-          {/* Preview card for saving to gallery or sharing - not shown in UI but available for capture */}
+          {/* Preview card for saving to gallery or sharing - hidden but ready for capture */}
           <div 
             ref={previewCardRef} 
             className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4"
-            style={{ position: 'fixed', left: '-9999px', opacity: 0, width: '350px' }}
+            style={{ position: 'absolute', left: '-9999px', opacity: '0', width: '350px', height: 'auto' }}
           >
             <div className="flex items-start gap-4">
               <div className="bg-white p-2 rounded-md">
