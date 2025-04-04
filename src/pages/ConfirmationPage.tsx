@@ -497,9 +497,21 @@ const ConfirmationPage: React.FC = () => {
     return `${productName} purchased from ${shopName} for ${amount}. Order ID: ${order.orderId}. ${order.status === 'completed' ? 'Payment confirmed on ' : 'Payment pending as of '} ${date}.`;
   };
 
+  // Add function to generate dynamic image URL for social sharing
+  const getDynamicImageUrl = () => {
+    const productName = encodeURIComponent(getProductName());
+    const emoji = encodeURIComponent(getProductEmoji());
+    const amount = encodeURIComponent(formatCurrency(order.amount, order.currency));
+    const status = encodeURIComponent(order.status === 'completed' ? 'Payment Confirmed' : 'Payment Pending');
+    
+    // Use a dynamic image generation service (ogimage.vercel.app or similar)
+    // This constructs a URL that will return an image when visited
+    return `https://og-image.vercel.app/**${emoji}%20${productName}**.png?theme=dark&md=1&fontSize=100px&images=https%3A%2F%2Fassets.vercel.com%2Fimage%2Fupload%2Ffront%2Fassets%2Fdesign%2Fvercel-triangle-white.svg&images=https%3A%2F%2Fyodl.me%2Ficon.png&widths=350&heights=350&caption=${status}&txtcolor=purple&bgGradient=true&bgColor=%2325104a&bgSecondaryColor=%2310021e&subtitleColor=green&descriptionColor=rgba(255%2C255%2C255%2C0.7)&desc=${amount}`;
+  };
+
   return (
     <div className="max-w-lg mx-auto px-4 py-4 md:py-8">
-      {/* Static meta tags with order-specific info */}
+      {/* Dynamic meta tags for social sharing */}
       <Helmet>
         <title>{getSocialPreviewTitle()}</title>
         <meta name="description" content={getSocialPreviewDescription()} />
@@ -510,8 +522,8 @@ const ConfirmationPage: React.FC = () => {
         <meta property="og:title" content={getSocialPreviewTitle()} />
         <meta property="og:description" content={getSocialPreviewDescription()} />
         
-        {/* Use a static image URL for consistent results */}
-        <meta property="og:image" content="https://lovable.dev/merchant-yapp-order-preview.png" />
+        {/* Use a dynamically generated image URL based on order details */}
+        <meta property="og:image" content={getDynamicImageUrl()} />
         <meta property="og:image:width" content="1200" />
         <meta property="og:image:height" content="630" />
         
@@ -520,7 +532,7 @@ const ConfirmationPage: React.FC = () => {
         <meta name="twitter:url" content={window.location.href} />
         <meta name="twitter:title" content={getSocialPreviewTitle()} />
         <meta name="twitter:description" content={getSocialPreviewDescription()} />
-        <meta name="twitter:image" content="https://lovable.dev/merchant-yapp-order-preview.png" />
+        <meta name="twitter:image" content={getDynamicImageUrl()} />
 
         {/* Product-specific structured data for SEO */}
         <script type="application/ld+json">
