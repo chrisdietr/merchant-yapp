@@ -389,6 +389,53 @@ const ConfirmationPage: React.FC = () => {
     return 'Unknown Product';
   };
 
+  // Helper function to get telegram handle from shops config
+  const getShopTelegramHandle = () => {
+    // First check if shopInfo has a telegramHandle
+    if (shopInfo && shopInfo.telegramHandle) {
+      console.log('Found telegramHandle in shopInfo:', shopInfo.telegramHandle);
+      return shopInfo.telegramHandle;
+    }
+
+    // If we have an ownerAddress, look it up again in shops config
+    if (order.ownerAddress) {
+      const shop = getShopByOwnerAddress(order.ownerAddress);
+      console.log('Looking up shop by ownerAddress:', order.ownerAddress, shop);
+      if (shop && shop.telegramHandle) {
+        return shop.telegramHandle;
+      }
+    }
+
+    // Last resort: check if we can find the first shop with a telegramHandle
+    // Extract product ID from order ID (format: product_ID_TIMESTAMP)
+    if (orderId && orderId.startsWith('product_')) {
+      const productId = orderId.split('_')[1];
+      console.log('Finding shop by product ID:', productId);
+      
+      // Find a product with this ID
+      const product = shopsData.products.find((p: any) => p.id === productId);
+      if (product) {
+        // Find shop with matching owner address
+        for (const shop of shopsData.shops) {
+          if (shop.ownerAddress && shop.telegramHandle) {
+            console.log('Found shop with telegramHandle:', shop.name, shop.telegramHandle);
+            return shop.telegramHandle;
+          }
+        }
+      }
+    }
+
+    // Directly check all shops for telegramHandle as a last resort
+    for (const shop of shopsData.shops) {
+      if (shop.telegramHandle) {
+        console.log('Found fallback shop with telegramHandle:', shop.name, shop.telegramHandle);
+        return shop.telegramHandle;
+      }
+    }
+
+    return null;
+  };
+
   return (
     <div className="max-w-lg mx-auto px-4 py-4 md:py-8">
       <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Order Confirmation</h1>
@@ -527,12 +574,11 @@ const ConfirmationPage: React.FC = () => {
           </div>
           
           <div className="flex flex-col space-y-3">
-            {/* Show Telegram button if there's a telegramHandle in the shop config */}
+            {/* Always show Telegram button if any telegramHandle exists in configuration */}
             {(() => {
-              // First try to get telegramHandle from shopInfo
-              const telegramHandle = shopInfo?.telegramHandle;
+              const telegramHandle = getShopTelegramHandle();
+              console.log('Telegram handle for button:', telegramHandle);
               
-              // If found and valid, show the button
               if (telegramHandle) {
                 return (
                   <a 
