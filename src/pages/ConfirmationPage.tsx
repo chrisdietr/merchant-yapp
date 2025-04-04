@@ -469,8 +469,11 @@ const ConfirmationPage: React.FC = () => {
             </div>
           </div>
           
-          {/* Preview Card for saving to gallery */}
-          <div ref={previewCardRef} className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4 mb-6">
+          {/* Nice looking preview card for saving to gallery */}
+          <div 
+            ref={previewCardRef} 
+            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-4 mb-6"
+          >
             <div className="flex items-start gap-4">
               <div className="bg-white p-2 rounded-md">
                 <QRCode 
