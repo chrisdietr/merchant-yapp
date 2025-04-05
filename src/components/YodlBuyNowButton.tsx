@@ -28,40 +28,9 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
   // Generate a unique order ID if not provided
   const uniqueOrderId = orderId || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   
-  // Handle direct SDK payment (for iframe context)
-  const handleDirectPayment = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    setLoading(true);
-    try {
-      // Store product metadata
-      YodlService.storeOrderInfo(uniqueOrderId, {
-        amount,
-        currency,
-        productName,
-        ownerAddress,
-        timestamp: new Date().toISOString()
-      });
-      
-      console.log('Initiating direct iframe payment for:', productName);
-      
-      // Use the SDK's requestPayment method without redirectUrl for iframe contexts
-      await YodlService.requestPayment(
-        amount, 
-        currency,
-        uniqueOrderId
-      );
-    } catch (error) {
-      console.error('Direct payment failed:', error);
-      alert(`Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    } finally {
-      setLoading(false);
-    }
-  };
-  
-  // Handle standard payment via SDK (for non-iframe context)
-  const handleStandardPayment = async (e: React.MouseEvent<HTMLButtonElement>) => {
+  // Handle payment via SDK
+  const handlePayment = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Prevent default behavior to avoid any unwanted navigation
     e.preventDefault();
     
     setLoading(true);
@@ -75,26 +44,27 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
         timestamp: new Date().toISOString()
       });
       
-      console.log('Initiating standard payment for:', productName);
+      console.log('Initiating payment with product name:', productName);
+      console.log('Operating in iframe mode:', isInIframe);
       
       // Use SDK to request payment with memo
       await YodlService.requestPaymentWithSDK(
         amount,
         currency,
         uniqueOrderId,
-        { productName, ownerAddress }
+        { productName, ownerAddress } // Pass metadata directly
       );
+      // Note: We don't need to handle the response here as the SDK 
+      // will redirect to the specified redirectUrl after payment
     } catch (error) {
       console.error('Payment failed:', error);
+      // Show error to user
       alert(`Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
   };
 
-  // Choose the appropriate handler based on whether we're in an iframe
-  const handlePayment = isInIframe ? handleDirectPayment : handleStandardPayment;
-  
   // Use the UI Button component from the app's library
   return (
     <Button 

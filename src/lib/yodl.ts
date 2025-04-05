@@ -8,6 +8,12 @@ interface ExtendedYappSDK extends YappSDK {
   getPendingPayments?: (address: string) => Promise<Payment[]>;
 }
 
+// Extend the Payment interface for our use case
+interface ExtendedPayment extends Payment {
+  memo?: string;
+  metadata?: any;
+}
+
 // Singleton instance of the YappSDK
 class YodlService {
   private static instance: YodlService;
@@ -153,32 +159,115 @@ class YodlService {
         ownerAddress: metadata?.ownerAddress // Store owner address if provided
       });
       
-      // Special handling for iframe mode
-      const isIframe = this.isInIframe();
+      // We'll keep the redirectUrl for normal navigation post-payment
+      // But we'll also set up for webhook handling
+      const webhookId = `webhook_${Date.now()}`;
+      localStorage.setItem(`payment_pending_${memo}`, webhookId);
       
-      if (isIframe) {
-        console.log('Operating in iframe mode, using special iframe API handling');
-        
-        // In iframe mode, we need to avoid opening a new window
-        // Inside an iframe, don't set redirectUrl to prevent new windows
-        return await this.sdk.requestPayment(WALLET_ADDRESS, {
-          amount,
-          currency,
-          memo,
-        });
-      } else {
-        // Standard flow for non-iframe contexts
-        return await this.sdk.requestPayment(WALLET_ADDRESS, {
-          amount,
-          currency,
-          memo,
-          redirectUrl: window.location.href, 
-        });
+      // Store additional metadata in localStorage for retrieval
+      localStorage.setItem(`payment_metadata_${memo}`, JSON.stringify({
+        webhookId,
+        isIframe: this.isInIframe(),
+        orderInfo: memo
+      }));
+      
+      // Use origin for redirect to ensure we stay in the same context
+      const redirectUrl = `${window.location.origin}/confirmation/${memo}`;
+      
+      // Request payment using the SDK with only supported parameters
+      const response = await this.sdk.requestPayment(WALLET_ADDRESS, {
+        amount,
+        currency,
+        memo,
+        redirectUrl, // Keep redirect for normal flow
+      });
+
+      // Set up a timer to poll for payment status for iframe scenarios
+      if (this.isInIframe()) {
+        console.log('Setting up payment status polling for iframe mode');
+        this._setupPaymentStatusPolling(memo, webhookId);
       }
+      
+      return response;
     } catch (error) {
       console.error('Payment failed:', error);
       throw error;
     }
+  }
+  
+  // Poll for payment status as an alternative to redirects in iframe mode
+  private _setupPaymentStatusPolling(orderId: string, webhookId: string, attempts = 0): void {
+    // Maximum number of polling attempts (10 minutes at 30-second intervals)
+    const MAX_ATTEMPTS = 20;
+    const POLLING_INTERVAL = 30000; // 30 seconds
+    
+    if (attempts >= MAX_ATTEMPTS) {
+      console.log(`Giving up polling for payment ${orderId} after ${MAX_ATTEMPTS} attempts`);
+      return;
+    }
+    
+    setTimeout(async () => {
+      try {
+        // Check if payment has been completed via webhook
+        const webhookReceived = localStorage.getItem(`payment_completed_${webhookId}`);
+        
+        if (webhookReceived) {
+          console.log(`Payment for ${orderId} confirmed via webhook`);
+          // Clean up localStorage
+          localStorage.removeItem(`payment_pending_${orderId}`);
+          localStorage.removeItem(`payment_completed_${webhookId}`);
+          
+          // Refresh the page or update UI as needed
+          // But avoid redirect in iframe context
+          if (this.isInIframe()) {
+            // Post message to parent to update UI
+            window.parent.postMessage({
+              type: 'PAYMENT_COMPLETED',
+              orderId,
+              success: true
+            }, '*');
+          }
+          return;
+        }
+        
+        // If no webhook confirmation, check directly with API
+        // This is a fallback mechanism
+        try {
+          // Look for pending payments
+          const pendingPayments = await this.checkPendingPayments();
+          const matchingPayment = pendingPayments.find(p => {
+            // Cast to extended payment type
+            const extendedPayment = p as ExtendedPayment;
+            return extendedPayment.memo === orderId || 
+              (typeof extendedPayment.metadata === 'object' && 
+               extendedPayment.metadata?.orderInfo === orderId);
+          });
+          
+          if (matchingPayment) {
+            console.log(`Found matching payment for ${orderId}:`, matchingPayment);
+            // Handle successful payment
+            if (this.isInIframe()) {
+              window.parent.postMessage({
+                type: 'PAYMENT_COMPLETED',
+                orderId,
+                success: true,
+                payment: matchingPayment
+              }, '*');
+            }
+            return;
+          }
+        } catch (checkError) {
+          console.warn('Error checking pending payments:', checkError);
+        }
+        
+        // Continue polling
+        this._setupPaymentStatusPolling(orderId, webhookId, attempts + 1);
+      } catch (error) {
+        console.error('Error in payment polling:', error);
+        // Continue polling despite errors
+        this._setupPaymentStatusPolling(orderId, webhookId, attempts + 1);
+      }
+    }, POLLING_INTERVAL);
   }
 
   // Parse payment details from URL (used after redirect)
