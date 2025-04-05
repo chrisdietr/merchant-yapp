@@ -8,7 +8,6 @@ import { formatCurrency } from '../utils/currency';
 import { getShopByOwnerAddress, generateTelegramLink } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 import shopsData from "@/config/shops.json";
-import { Helmet } from 'react-helmet';
 
 // Order details interface
 interface OrderDetails {
@@ -33,35 +32,38 @@ shopsData.products.forEach((product: any) => {
 const ConfirmationPage: React.FC = () => {
   const { orderId } = useParams<{ orderId: string }>();
   const [order, setOrder] = useState<OrderDetails>({
-    orderId: orderId || 'unknown',
+    orderId: orderId ? orderId : 'unknown',
     status: 'pending',
     amount: 0,
-    currency: 'USD',
+    currency: 'USD'
   });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [shopInfo, setShopInfo] = useState<any>(null);
-  const [isCapturing, setIsCapturing] = useState<boolean>(false);
-  const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [socialPreviewUrl, setSocialPreviewUrl] = useState<string>('');
   const confirmationRef = useRef<HTMLDivElement>(null);
   const previewCardRef = useRef<HTMLDivElement>(null);
-  const socialPreviewRef = useRef<HTMLDivElement>(null);
+  const [isCapturing, setIsCapturing] = useState<boolean>(false);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  
+  // Product name map for display
+  const productMap: {[key: string]: string} = {
+    "1": "T-Shirt",
+    "2": "Coffee",
+    "3": "Hat"
+  };
 
-  // Handle screen resize to detect mobile
+  // Check if device is mobile
   useEffect(() => {
     const checkIsMobile = () => {
       setIsMobile(window.innerWidth < 768);
     };
     
-    // Check initially
     checkIsMobile();
-    
-    // Listen for resize events
     window.addEventListener('resize', checkIsMobile);
     
-    // Cleanup
-    return () => window.removeEventListener('resize', checkIsMobile);
+    return () => {
+      window.removeEventListener('resize', checkIsMobile);
+    };
   }, []);
 
   useEffect(() => {
@@ -213,14 +215,6 @@ const ConfirmationPage: React.FC = () => {
       setLoading(false);
     }
   }, [orderId]);
-
-  // Effect to generate social preview when data is ready
-  useEffect(() => {
-    if (order.status === 'completed' && order.productName && shopInfo?.name && !socialPreviewUrl) {
-      generateSocialPreviewImage();
-    }
-    // Regenerate if key data changes (optional, depends on desired behavior)
-  }, [order.status, order.productName, shopInfo, socialPreviewUrl]); // Added dependencies
 
   // Fetch payment details from Yodl API
   const fetchPaymentDetails = async (txHash: string) => {
@@ -381,9 +375,8 @@ const ConfirmationPage: React.FC = () => {
     // Debug the shop name
     console.log('Shop name for message:', shopName, 'Product name:', productName);
     
-    const orderLink = getOrderQRValue(); // Use the order verification link instead of txn URL
-    
-    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from? Order confirmation: ${orderLink}`;
+    // Remove order link from the message
+    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from?`;
   };
 
   // Find product emoji from productId in the orderId
@@ -479,90 +472,8 @@ const ConfirmationPage: React.FC = () => {
     return null;
   };
 
-  // Function to generate social preview image URL - now dynamically creates an image
-  const generateSocialPreviewImage = async () => {
-    if (!socialPreviewRef.current || loading) {
-      return '';
-    }
-    
-    try {
-      // Make the social preview visible temporarily for capturing
-      const previewElement = socialPreviewRef.current;
-      const originalStyles = {
-        position: previewElement.style.position,
-        visibility: previewElement.style.visibility,
-        opacity: previewElement.style.opacity
-      };
-      
-      // Position offscreen but fully render
-      previewElement.style.position = 'fixed';
-      previewElement.style.left = '-9999px';
-      previewElement.style.top = '0';
-      previewElement.style.opacity = '1';
-      previewElement.style.visibility = 'visible';
-      previewElement.style.pointerEvents = 'none';
-      
-      // Wait for rendering
-      await new Promise(resolve => setTimeout(resolve, 100));
-      
-      // Generate image
-      const canvas = await html2canvas(previewElement, {
-        backgroundColor: '#25104a',
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        allowTaint: true
-      });
-      
-      // Reset styles
-      previewElement.style.position = originalStyles.position;
-      previewElement.style.visibility = originalStyles.visibility;
-      previewElement.style.opacity = originalStyles.opacity;
-      
-      // Get data URL
-      const dataUrl = canvas.toDataURL('image/png');
-      return dataUrl;
-    } catch (error) {
-      console.error('Error generating social preview:', error);
-      return '';
-    }
-  };
-
-  // Helper function to get the title for meta tags
-  const getMetaTitle = () => "Purchase confirmed ✅";
-
-  // Helper function to get the description for meta tags
-  const getMetaDescription = () => {
-    if (order.status === 'completed' && order.productName && shopInfo?.name) {
-      return `Just bought ${order.productName} from ${shopInfo.name}`;
-    }
-    return "View your purchase confirmation."; // Fallback description
-  };
-
   return (
     <div className="max-w-lg mx-auto px-4 py-4 md:py-8">
-      {/* Add social media preview metadata */}
-      <Helmet>
-        <title>{getMetaTitle()}</title>
-        <meta name="description" content={getMetaDescription()} />
-        
-        {/* Open Graph / Facebook */}
-        <meta property="og:type" content="website" />
-        <meta property="og:url" content={window.location.href} />
-        <meta property="og:title" content={getMetaTitle()} />
-        <meta property="og:description" content={getMetaDescription()} />
-        {socialPreviewUrl && <meta property="og:image" content={socialPreviewUrl} />}
-        <meta property="og:image:width" content="1200" />
-        <meta property="og:image:height" content="630" />
-        
-        {/* Twitter */}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:url" content={window.location.href} />
-        <meta name="twitter:title" content={getMetaTitle()} />
-        <meta name="twitter:description" content={getMetaDescription()} />
-        {socialPreviewUrl && <meta name="twitter:image" content={socialPreviewUrl} />}
-      </Helmet>
-      
       <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Order Confirmation</h1>
       
       {loading ? (
@@ -713,17 +624,25 @@ const ConfirmationPage: React.FC = () => {
               
               if (telegramHandle) {
                 return (
-                  <a 
-                    href={generateTelegramLink(telegramHandle, getTelegramMessage())}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full"
-              >
+                  <Button 
+                    onClick={() => {
+                      // First save confirmation to gallery
+                      saveConfirmation().then(() => {
+                        // Then open Telegram with prepopulated message
+                        window.open(generateTelegramLink(telegramHandle, getTelegramMessage()), '_blank');
+                      }).catch(error => {
+                        console.error('Error saving image before opening Telegram:', error);
+                        // Still open Telegram even if saving fails
+                        window.open(generateTelegramLink(telegramHandle, getTelegramMessage()), '_blank');
+                      });
+                    }}
+                    className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full"
+                  >
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 24 24" fill="#fff">
                       <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm5.562 8.079l-1.702 8.493c-.127.617-.492.864-1 .539l-2.766-2.04-1.336 1.285c-.148.148-.272.272-.56.272l.2-2.834 5.152-4.651c.225-.196-.049-.308-.345-.112l-6.37 4.009-2.744-.912c-.594-.185-.604-.592.128-.878l10.728-4.136c.494-.179.927.108.765.965z"/>
-                </svg>
-                Contact Seller on Telegram
-              </a>
+                    </svg>
+                    Contact Seller on Telegram
+                  </Button>
                 );
               }
               return null;
@@ -736,7 +655,7 @@ const ConfirmationPage: React.FC = () => {
               
               <Button onClick={copySocialShareLink} variant="secondary" className="flex-1">
                 Copy Share Link
-            </Button>
+              </Button>
             </div>
             
             <Link to="/">
@@ -745,57 +664,6 @@ const ConfirmationPage: React.FC = () => {
               </Button>
             </Link>
           </div>
-
-          {/* Hidden element for social media preview image generation - matched to gallery save style but optimized for social */}
-          <div 
-            ref={socialPreviewRef} 
-            className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-8"
-            style={{ 
-              position: 'absolute', 
-              left: '-9999px', 
-              visibility: 'hidden',
-              width: '1200px', 
-              height: '630px'
-            }}
-          >
-            <div className="flex items-center justify-center h-full">
-              <div className="flex items-start gap-6 max-w-4xl">
-                <div className="bg-white p-4 rounded-md">
-                  <QRCode 
-                    value={getOrderQRValue()} 
-                    size={180}
-                    renderAs="canvas"
-                    includeMargin={false}
-                  />
-                </div>
-                <div className="flex-1 text-white">
-                  <div className="flex items-center">
-                    <span className="text-6xl mr-4">{getProductEmoji()}</span>
-                    <div>
-                      <h1 className="font-bold text-4xl">{getProductName()}</h1>
-                      <p className="text-3xl mt-2 opacity-80">Order #{order.orderId.split('_').pop()}</p>
-                    </div>
-                  </div>
-                  
-                  <p className="text-green-300 font-medium text-3xl mt-6">
-                    {order.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}
-                  </p>
-                  
-                  <p className="text-6xl font-bold mt-4">
-                    {formatCurrency(order.amount, order.currency)}
-                  </p>
-                  
-                  <p className="text-gray-300 text-2xl mt-4">
-                    {new Date(order.timestamp || Date.now()).toLocaleString()}
-                  </p>
-                  
-                  <p className="text-gray-300 text-2xl mt-6">
-                    merchant-yapp.lovable.app
-                  </p>
-                </div>
-              </div>
-          </div>
-        </div>
         </>
       )}
     </div>

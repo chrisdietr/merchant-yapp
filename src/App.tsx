@@ -29,9 +29,6 @@ export default function App() {
               <Toaster />
               <Router>
                 <Routes>
-                  {/* Special route for social media previews - no layout */}
-                  
-                  {/* All other routes wrapped in Layout */}
                   <Route element={<Layout />}>
                     <Route path="/" element={<Index />} />
                     <Route path="/payment" element={<Payment />} />

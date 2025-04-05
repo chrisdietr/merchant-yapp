@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import yodlService from '../lib/yodl';
 import { formatCurrency } from '../utils/currency';
-import { getShopByOwnerAddress } from '@/lib/utils';
+import { getShopByOwnerAddress, generateTelegramLink } from '@/lib/utils';
 import shopsData from "@/config/shops.json";
+import html2canvas from 'html2canvas';
+import QRCode from 'qrcode.react';
 
 interface OrderDetails {
   orderId: string;
@@ -37,6 +39,7 @@ const VerifyPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [shopInfo, setShopInfo] = useState<any>(null);
   const [product, setProduct] = useState<Product | null>(null);
+  const previewCardRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadOrderData = async () => {
@@ -114,6 +117,65 @@ const VerifyPage: React.FC = () => {
 
     loadOrderData();
   }, [orderId, txHash]);
+
+  // Function to save verification to gallery
+  const saveConfirmation = async () => {
+    if (!previewCardRef.current) return;
+    
+    try {
+      // Temporarily make the card visible for capturing
+      const previewCard = previewCardRef.current;
+      const originalStyles = {
+        position: previewCard.style.position,
+        left: previewCard.style.left,
+        opacity: previewCard.style.opacity
+      };
+      
+      // Make it visible in the DOM but below the fold
+      previewCard.style.position = 'fixed';
+      previewCard.style.left = '0';
+      previewCard.style.top = '100vh';  // Position it just below the viewport
+      previewCard.style.opacity = '1';
+      previewCard.style.zIndex = '9999';
+      
+      // Wait for styles to apply and DOM to update
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Capture the now-visible element
+      const canvas = await html2canvas(previewCard, {
+        backgroundColor: document.body.classList.contains('dark') ? '#25104a' : '#ffffff',
+        scale: 2, // Higher quality
+        logging: true, // Enable logging for troubleshooting
+        useCORS: true,
+        allowTaint: true,
+      });
+      
+      // Reset original styles
+      previewCard.style.position = originalStyles.position;
+      previewCard.style.left = originalStyles.left;
+      previewCard.style.opacity = originalStyles.opacity;
+      
+      // Create an anchor element to download the image
+      const link = document.createElement('a');
+      link.href = canvas.toDataURL('image/png');
+      link.download = `order-${order?.orderId || 'verification'}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('Error saving confirmation:', error);
+      alert('Failed to save confirmation');
+    }
+  };
+
+  // Generate the Telegram message with order details
+  const getTelegramMessage = () => {
+    let productName = product?.name || order?.productName || "a product";
+    let shopName = shopInfo?.name || "the shop";
+    
+    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from?`;
+  };
 
   return (
     <div className="max-w-lg mx-auto px-4 py-4 md:py-8">
@@ -242,17 +304,26 @@ const VerifyPage: React.FC = () => {
             <div className="mt-4 text-center bg-muted/30 p-3 rounded-md">
               <h3 className="font-semibold text-black dark:text-white mb-1">{shopInfo.name}</h3>
               {shopInfo.telegramHandle && (
-                <a 
-                  href={`https://t.me/${shopInfo.telegramHandle}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center text-sm text-blue-500 hover:underline gap-1"
+                <Button 
+                  onClick={() => {
+                    // First save confirmation to gallery
+                    saveConfirmation().then(() => {
+                      // Then open Telegram with prepopulated message
+                      window.open(generateTelegramLink(shopInfo.telegramHandle, getTelegramMessage()), '_blank');
+                    }).catch(error => {
+                      console.error('Error saving image before opening Telegram:', error);
+                      // Still open Telegram even if saving fails
+                      window.open(generateTelegramLink(shopInfo.telegramHandle, getTelegramMessage()), '_blank');
+                    });
+                  }}
+                  variant="link"
+                  className="inline-flex items-center text-sm text-blue-500 hover:underline gap-1 p-0 h-auto"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21.99 5.363a1.068 1.068 0 0 0-1.058-.794 2.01 2.01 0 0 0-.513.106L2.217 10.148a1.29 1.29 0 0 0-.792.964c-.099.431.18.869.639.967.019 0 .039.01.039.01l4.959 1.467 1.758 5.424a1.28 1.28 0 0 0 1.096.78 1.183 1.183 0 0 0 1.058-.493l2.453-2.76 4.86 3.582c.157.116.337.165.515.165a1.18 1.18 0 0 0 .462-.097c.355-.175.582-.551.582-.946V5.753a.706.706 0 0 0-.099-.39z" />
                   </svg>
                   Contact on Telegram
-                </a>
+                </Button>
               )}
             </div>
           )}
@@ -263,6 +334,48 @@ const VerifyPage: React.FC = () => {
           <AlertDescription>Order not found</AlertDescription>
         </Alert>
       )}
+      
+      {/* Preview card for saving to gallery - hidden initially */}
+      <div 
+        ref={previewCardRef} 
+        className="bg-gradient-to-br from-gray-900 to-purple-900 border border-purple-500/30 rounded-lg shadow-lg p-3"
+        style={{ position: 'absolute', left: '-9999px', opacity: '0', width: '320px', height: 'auto' }}
+      >
+        <div className="flex items-start gap-3">
+          <div className="bg-white p-1.5 rounded-md">
+            {order && (
+              <QRCode 
+                value={window.location.href} 
+                size={50}
+                renderAs="canvas"
+                includeMargin={false}
+              />
+            )}
+          </div>
+          <div className="flex-1 text-white">
+            <div className="flex items-center">
+              <span className="text-xl mr-1.5">{product?.emoji || '🛒'}</span>
+              <span className="font-small text-sm">{product?.name || order?.productName || 'Order Verification'}</span>
+            </div>
+            
+            <p className="text-green-300 font-medium text-xs mt-1.5">
+              {order?.status === 'completed' ? '✓ Payment Confirmed' : '⏱ Payment Pending'}
+            </p>
+            
+            {order && (
+              <p className="text-base font-bold my-0.5">
+                {formatCurrency(order.amount, order.currency)}
+              </p>
+            )}
+            
+            {order?.timestamp && (
+              <p className="text-gray-300 text-[10px]">
+                {new Date(order.timestamp).toLocaleString()}
+              </p>
+            )}
+          </div>
+        </div>
+      </div>
       
       <div className="text-center">
         <Link to="/">
