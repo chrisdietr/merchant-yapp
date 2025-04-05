@@ -48,13 +48,13 @@ export function ProductCard({ product }: ProductCardProps) {
 
   return (
     <Card className="w-full h-full flex flex-col gradient-card text-card-foreground border border-white/10 hover:shadow-xl hover:shadow-purple-500/30">
-      <CardHeader className="pb-3 md:pb-2">
-        <CardTitle className="flex items-center gap-3 md:gap-3 text-xl md:text-2xl">
+      <CardHeader className="pb-2 px-3">
+        <CardTitle className="flex items-center gap-2 md:gap-3 text-xl md:text-2xl">
           <span className="text-3xl md:text-4xl bg-white/15 p-2 rounded-full flex-shrink-0">{product.emoji}</span>
           <span className="font-bold">{product.name}</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="pb-4 flex-grow">
+      <CardContent className="pb-3 px-3 flex-grow">
         <p className="text-xs md:text-sm text-card-foreground/80 mb-2">{product.description}</p>
         <p className="text-lg md:text-xl font-bold text-white">
           {product.price} {product.currency}
@@ -71,7 +71,7 @@ export function ProductCard({ product }: ProductCardProps) {
           )}
         </div>
       </CardContent>
-      <CardFooter className="pt-2 mt-auto">
+      <CardFooter className="pt-2 px-3 mt-auto">
         {!address ? (
           <ConnectButton.Custom>
             {({ openConnectModal }) => (
