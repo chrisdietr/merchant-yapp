@@ -197,9 +197,9 @@ class YodlService {
   
   // Poll for payment status as an alternative to redirects in iframe mode
   private _setupPaymentStatusPolling(orderId: string, webhookId: string, attempts = 0): void {
-    // Maximum number of polling attempts (10 minutes at 30-second intervals)
-    const MAX_ATTEMPTS = 20;
-    const POLLING_INTERVAL = 30000; // 30 seconds
+    // Maximum number of polling attempts (5 minutes at 5-second intervals)
+    const MAX_ATTEMPTS = 60;
+    const POLLING_INTERVAL = 5000; // 5 seconds
     
     if (attempts >= MAX_ATTEMPTS) {
       console.log(`Giving up polling for payment ${orderId} after ${MAX_ATTEMPTS} attempts`);
