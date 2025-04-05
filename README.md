@@ -11,13 +11,14 @@ A decentralized point-of-sale application with crypto payments built with React,
 - **Product Management**: Simple configuration to add, remove, or update products
 - **Theme Support**: Beautiful purple theme with both light and dark mode
 - **Fully Responsive Design**: Optimized for mobile, tablet, and desktop devices
-- **Mobile-Friendly UI**: Hamburger menu, touch-optimized buttons, and smooth interactions
+- **Mobile-Friendly UI**: Fixed navigation bar, touch-optimized buttons, and smooth interactions
 - **Order Confirmations**: Clean, shareable receipts with product details and QR codes
 - **QR Code Verification**: Enhanced scanning capabilities for both URL and JSON QR codes
 - **Verification Page**: Customer-facing verification page showing payment status and details
-- **Telegram Integration**: Optional direct customer communication with product information
+- **Telegram Integration**: Direct customer communication with transaction receipts
 - **Inventory Management**: Support for in-stock, out-of-stock, and unlimited inventory
 - **Security**: Admin privileges locked to specific wallet addresses
+- **Iframe Support**: Enhanced compatibility for embedding in websites with cross-origin handling
 
 ## 🚀 Quick Start
 
@@ -112,23 +113,23 @@ Add your products to the `products` array in `src/config/shops.json`:
     "name": "T-Shirt",
     "description": "Premium cotton t-shirt",
     "price": 0.1,
-    "currency": "BRL",
+    "currency": "USD",
     "emoji": "👕",
     "inStock": true
   },
   {
     "id": "2",
-    "name": "Coffee",
-    "description": "Fresh brewed coffee",
+    "name": "Beer",
+    "description": "Duh.",
     "price": 0.05,
-    "currency": "BRL",
-    "emoji": "☕",
+    "currency": "THB",
+    "emoji": "🍺",
     "inStock": "infinite"
   },
   {
     "id": "3",
     "name": "Limited Edition Hat",
-    "description": "Currently unavailable",
+    "description": "One size",
     "price": 0.2,
     "currency": "BRL",
     "emoji": "🧢",
@@ -148,6 +149,8 @@ Add your products to the `products` array in `src/config/shops.json`:
 | currency | Currency code | "BRL", "USD", "EUR", "CHF", "THB" |
 | emoji | Visual representation | "☕", "👕", "🧢" |
 | inStock | Availability status | true, false, "infinite" |
+
+> **Important**: The product names defined in `shops.json` are used throughout the application including order confirmations and Telegram messages. Ensure they match what customers will recognize.
 
 > **Note**: The `inStock` field now supports three states:
 > - `true` - The product is in stock and available for purchase
@@ -185,10 +188,11 @@ The enhanced scanner now supports:
 ### Mobile-Friendly Shopping
 
 The application is fully optimized for mobile devices with:
+- Fixed navigation bar that stays visible when scrolling
 - Touch-friendly buttons and interactions
 - Responsive product grids that adapt to screen size
-- Collapsible mobile menu for navigation
 - Optimized font sizes and spacing
+- Enhanced UI visibility with proper overlays and backgrounds
 
 ### Order Confirmation
 
@@ -198,6 +202,7 @@ After a successful purchase, customers will receive a confirmation page that inc
 - Transaction details with full transaction hash
 - Option to save the confirmation to their device's gallery
 - Direct "Contact Seller on Telegram" button (if telegramHandle is configured)
+- Transaction receipt link in Telegram messages
 
 ### Order Verification
 
@@ -256,13 +261,15 @@ This application integrates with Yodl payment system. To configure your payment 
 1. Set your wallet address in the `ownerAddress` field of your shop in shops.json
 2. Ensure your wallet is properly set up to receive the specified currencies
 
-### Telegram Integration (Optional)
+### Telegram Integration
 
-The application provides an optional way for customers to contact sellers:
+The application provides a way for customers to contact sellers via Telegram:
 
 1. Set your Telegram handle in the `telegramHandle` field in shops.json
 2. When customers complete a purchase, they can click the "Contact Seller on Telegram" button
-3. This opens Telegram with a pre-filled message including product name and transaction details
+3. This opens Telegram with a pre-filled message including:
+   - Product name and shop information
+   - Transaction receipt link in the format `yodl.me/tx/{txHash}`
 4. If you leave the telegramHandle empty, the button will not be displayed
 
 ## 📱 Deployment
@@ -281,7 +288,7 @@ yarn build
 
 ### Iframe Embedding
 
-This application is designed to be easily embedded in iframes, making it ideal for integration with other websites:
+This application is designed to be easily embedded in iframes, with enhanced compatibility:
 
 1. **Basic embedding**:
 ```html
@@ -375,6 +382,15 @@ The application sends several types of messages to the parent window:
 }
 ```
 
+### Iframe Ethereum Provider Compatibility
+
+The application now includes improved compatibility with Ethereum providers in iframe contexts:
+
+- Safe detection of window.ethereum availability
+- Proper handling of cross-origin restrictions
+- Fallback mechanisms for payment processing
+- Message-based communication for payment completion
+
 ## ❓ Troubleshooting
 
 ### Common Issues
@@ -392,11 +408,17 @@ The application sends several types of messages to the parent window:
 3. **Wallet connection issues**:
    - Make sure you have MetaMask or another Web3 wallet installed
    - Check that you're on a supported network
+   - In iframe contexts, wallet interactions may be limited by browser security
 
 4. **Mobile display issues**:
    - Ensure your viewport meta tag is properly set
    - Test on multiple devices or use browser developer tools device emulation
    - Check that media queries are working correctly
+
+5. **Iframe embedding issues**:
+   - Ensure proper permissions are set in the iframe tag
+   - Check for cross-origin issues in browser console
+   - Verify proper communication between parent and iframe
 
 ## 🤝 Contributing
 
