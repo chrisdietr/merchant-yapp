@@ -48,6 +48,20 @@ export function ConnectWalletButton() {
     };
   }, [isAdmin, isAuthenticated, signIn]);
   
+  // Handle sign in with proper loading state
+  const handleSignIn = async () => {
+    try {
+      setIsConnecting(true);
+      console.log('Attempting to sign in...');
+      const success = await signIn();
+      console.log('Sign in result:', success);
+    } catch (error) {
+      console.error('Error during sign in:', error);
+    } finally {
+      setIsConnecting(false);
+    }
+  };
+  
   // When in Yodl iframe and we have a detected address, show custom button
   if (isYodlIframe && yodlAddress) {
     return (
@@ -57,10 +71,7 @@ export function ConnectWalletButton() {
             variant="outline" 
             size={isMobile ? "xs" : "sm"}
             className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10 px-2 py-1 md:px-3 md:py-1.5"
-            onClick={() => {
-              setIsConnecting(true);
-              signIn().finally(() => setIsConnecting(false));
-            }}
+            onClick={handleSignIn}
             disabled={isConnecting}
           >
             {isConnecting ? 'Signing...' : 'Sign-In'}
@@ -79,13 +90,73 @@ export function ConnectWalletButton() {
     );
   }
   
-  // Default to RainbowKit's ConnectButton
+  // Default to RainbowKit's ConnectButton with custom styling
   return (
-    <ConnectButton 
-      showBalance={false}
-      chainStatus="none"
-      accountStatus="address"
-      label="Connect"
-    />
+    <ConnectButton.Custom>
+      {({
+        account,
+        chain,
+        openAccountModal,
+        openChainModal,
+        openConnectModal,
+        mounted,
+      }) => {
+        const ready = mounted;
+        
+        return (
+          <div
+            {...(!ready && {
+              'aria-hidden': true,
+              style: {
+                opacity: 0,
+                pointerEvents: 'none',
+                userSelect: 'none',
+              },
+            })}
+          >
+            {(() => {
+              if (!mounted || !account || !chain) {
+                return (
+                  <Button 
+                    onClick={openConnectModal} 
+                    variant="outline"
+                    size={isMobile ? "xs" : "sm"}
+                    className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10"
+                  >
+                    Connect
+                  </Button>
+                );
+              }
+              
+              return (
+                <div className="flex items-center gap-1 md:gap-2">
+                  {isAdmin && !isAuthenticated && (
+                    <Button 
+                      variant="outline" 
+                      size={isMobile ? "xs" : "sm"}
+                      className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10 px-2 py-1 md:px-3 md:py-1.5"
+                      onClick={handleSignIn}
+                      disabled={isConnecting}
+                    >
+                      {isConnecting ? 'Signing...' : 'Sign-In'}
+                    </Button>
+                  )}
+                  
+                  <button
+                    onClick={openAccountModal}
+                    className="flex h-7 md:h-9 items-center gap-1 rounded-md border border-purple-300/50 bg-white/80 px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm font-medium hover:bg-purple-50/50 dark:border-white/20 dark:bg-background/80 dark:hover:bg-white/10"
+                  >
+                    <span className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-green-500 mr-1 md:mr-2"></span>
+                    <span className="truncate max-w-[80px] md:max-w-[120px]">
+                      {account.displayName}
+                    </span>
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        );
+      }}
+    </ConnectButton.Custom>
   );
 } 

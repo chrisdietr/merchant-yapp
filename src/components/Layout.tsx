@@ -17,6 +17,7 @@ export function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const [isMobile, setIsMobile] = useState(false)
   const [isIframe, setIsIframe] = useState(false)
+  const [isSigningIn, setIsSigningIn] = useState(false)
 
   // Handle screen resize
   useEffect(() => {
@@ -46,6 +47,20 @@ export function Layout({ children }: LayoutProps) {
   
   // Check if user has admin access (must be both admin AND authenticated)
   const hasAdminAccess = isAdmin && isAuthenticated
+  
+  // Handle sign in with proper loading state
+  const handleSignIn = async () => {
+    try {
+      setIsSigningIn(true);
+      console.log('Attempting to sign in from Layout...');
+      const success = await signIn();
+      console.log('Sign in result from Layout:', success);
+    } catch (error) {
+      console.error('Error during sign in from Layout:', error);
+    } finally {
+      setIsSigningIn(false);
+    }
+  };
 
   // Adjust layout when in iframe
   const iframeStyles = isIframe ? {
@@ -98,19 +113,6 @@ export function Layout({ children }: LayoutProps) {
                 <span className="animate-pulse inline-block w-2 h-2 rounded-full bg-green-600 dark:bg-green-400 mr-2"></span>
                 <span className="text-sm font-medium text-green-600 dark:text-green-400">Admin</span>
               </div>
-            )}
-            
-            {/* Simple Sign-In button (show on all devices when not in iframe) */}
-            {isConnected && isAdmin && !isAuthenticated && !isIframe && (
-              <Button 
-                variant="outline" 
-                size={isMobile ? "xs" : "sm"}
-                className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10 px-2 py-1 md:px-3 md:py-1.5"
-                onClick={() => signIn()}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Signing...' : 'Sign-In'}
-              </Button>
             )}
             
             {/* Theme toggle before wallet connect */}
