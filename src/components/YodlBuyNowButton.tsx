@@ -23,12 +23,16 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
   ownerAddress,
 }) => {
   const [loading, setLoading] = React.useState(false);
+  const isInIframe = YodlService.isInIframe();
 
   // Generate a unique order ID if not provided
   const uniqueOrderId = orderId || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   
   // Handle payment via SDK
-  const handlePayment = async () => {
+  const handlePayment = async (e: React.MouseEvent<HTMLButtonElement>) => {
+    // Prevent default behavior to avoid any unwanted navigation
+    e.preventDefault();
+    
     setLoading(true);
     try {
       // Store product metadata before initiating payment
@@ -41,6 +45,7 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
       });
       
       console.log('Initiating payment with product name:', productName);
+      console.log('Operating in iframe mode:', isInIframe);
       
       // Use SDK to request payment with memo
       await YodlService.requestPaymentWithSDK(

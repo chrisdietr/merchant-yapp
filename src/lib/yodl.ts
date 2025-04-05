@@ -153,15 +153,26 @@ class YodlService {
         ownerAddress: metadata?.ownerAddress // Store owner address if provided
       });
       
-      // Request payment using the SDK
-      const response = await this.sdk.requestPayment(WALLET_ADDRESS, {
+      // Special handling for iframe mode
+      const isIframe = this.isInIframe();
+      const options = {
         amount,
         currency,
         memo,
-        redirectUrl: window.location.href, // Stay in the current window
-      });
-
-      return response;
+        redirectUrl: window.location.href,
+      };
+      
+      // If in iframe, avoid target="_blank" behavior by using parent window location
+      if (isIframe) {
+        console.log('Operating in iframe mode, using special handling for redirects');
+        // Open in current iframe context by leveraging the SDK's iframe behavior
+        const response = await this.sdk.requestPayment(WALLET_ADDRESS, options);
+        return response;
+      } else {
+        // Standard flow for non-iframe contexts
+        const response = await this.sdk.requestPayment(WALLET_ADDRESS, options);
+        return response;
+      }
     } catch (error) {
       console.error('Payment failed:', error);
       throw error;
