@@ -56,75 +56,78 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300" style={iframeStyles}>
-      {/* Make header optional in iframe */}
-      {!isIframe && (
-        <header className="sticky top-0 z-10 border-b border-purple-200/50 dark:border-white/15 bg-white/90 dark:bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-background/60">
-          <div className="container flex h-16 items-center justify-between">
-            <Link to="/" className="text-xl font-bold text-purple-800 dark:text-white hover:text-primary md:flex-none flex-shrink-0">
-              Merchant Yapp
-            </Link>
+      {/* Always show header, even in iframe, but with adjusted styling */}
+      <header className={`sticky ${isIframe ? 'top-10' : 'top-0'} z-50 border-b border-purple-200/50 dark:border-white/15 bg-white/90 dark:bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-background/60`}>
+        <div className="container flex h-16 items-center justify-between relative">
+          {/* Center the title on mobile */}
+          <Link 
+            to="/" 
+            className={`text-xl font-bold text-purple-800 dark:text-white hover:text-primary md:flex-none flex-shrink-0 ${isMobile ? 'absolute left-1/2 -translate-x-1/2' : ''}`}
+          >
+            Merchant Yapp
+          </Link>
+          
+          {/* Mobile and Desktop navigation combined */}
+          <div className={`flex items-center gap-2 md:gap-4 ${isMobile ? 'ml-auto' : ''}`}>
+            {/* Admin Scanner link - only show if admin AND authenticated */}
+            {hasAdminAccess && (
+              <Link 
+                to="/admin/scanner"
+                className="flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-500 dark:text-green-400 dark:hover:text-green-300"
+                aria-label="Admin Scanner"
+              >
+                {/* QR Code icon */}
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="5" height="5" rx="1" />
+                  <rect x="16" y="3" width="5" height="5" rx="1" />
+                  <rect x="3" y="16" width="5" height="5" rx="1" />
+                  <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
+                  <path d="M21 21v.01" />
+                  <path d="M12 7v3a2 2 0 0 1-2 2H7" />
+                  <path d="M3 12h.01" />
+                  <path d="M12 3h.01" />
+                  <path d="M12 16v.01" />
+                </svg>
+                <span className="hidden md:inline">Admin Scanner</span>
+              </Link>
+            )}
             
-            {/* Mobile and Desktop navigation combined */}
-            <div className="flex items-center gap-2 md:gap-4">
-              {/* Admin Scanner link - only show if admin AND authenticated */}
-              {hasAdminAccess && (
-                <Link 
-                  to="/admin/scanner"
-                  className="flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-500 dark:text-green-400 dark:hover:text-green-300"
-                  aria-label="Admin Scanner"
-                >
-                  {/* QR Code icon */}
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="5" height="5" rx="1" />
-                    <rect x="16" y="3" width="5" height="5" rx="1" />
-                    <rect x="3" y="16" width="5" height="5" rx="1" />
-                    <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
-                    <path d="M21 21v.01" />
-                    <path d="M12 7v3a2 2 0 0 1-2 2H7" />
-                    <path d="M3 12h.01" />
-                    <path d="M12 3h.01" />
-                    <path d="M12 16v.01" />
-                  </svg>
-                  <span className="hidden md:inline">Admin Scanner</span>
-                </Link>
-              )}
-              
-              {/* Admin Indicator - only show a subtle indicator if admin (desktop only) */}
-              {hasAdminAccess && !isMobile && (
-                <div className="hidden md:flex items-center">
-                  <span className="animate-pulse inline-block w-2 h-2 rounded-full bg-green-600 dark:bg-green-400 mr-2"></span>
-                  <span className="text-sm font-medium text-green-600 dark:text-green-400">Admin</span>
-                </div>
-              )}
-              
-              {/* Simple Sign-In button (desktop only) */}
-              {isConnected && isAdmin && !isAuthenticated && !isMobile && (
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10"
-                  onClick={() => signIn()}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Signing...' : 'Sign-In'}
-                </Button>
-              )}
-              
-              {/* Theme toggle before wallet connect */}
-              <ThemeToggle />
-              
-              {/* Use the standard ConnectButton with minimal options (rightmost) */}
-              <ConnectButton 
-                showBalance={false}
-                chainStatus="none"
-                accountStatus={isMobile ? "avatar" : "address"}
-                label="Connect"
-              />
-            </div>
+            {/* Admin Indicator - only show a subtle indicator if admin (desktop only) */}
+            {hasAdminAccess && !isMobile && (
+              <div className="hidden md:flex items-center">
+                <span className="animate-pulse inline-block w-2 h-2 rounded-full bg-green-600 dark:bg-green-400 mr-2"></span>
+                <span className="text-sm font-medium text-green-600 dark:text-green-400">Admin</span>
+              </div>
+            )}
+            
+            {/* Simple Sign-In button (desktop only) */}
+            {isConnected && isAdmin && !isAuthenticated && !isMobile && (
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10"
+                onClick={() => signIn()}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Signing...' : 'Sign-In'}
+              </Button>
+            )}
+            
+            {/* Theme toggle before wallet connect */}
+            <ThemeToggle />
+            
+            {/* Use the standard ConnectButton with minimal options (rightmost) */}
+            <ConnectButton 
+              showBalance={false}
+              chainStatus="none"
+              accountStatus={isMobile ? "avatar" : "address"}
+              label="Connect"
+            />
           </div>
-        </header>
-      )}
-      <main className={isIframe ? "py-2 px-2" : "container py-6 px-4 md:py-8 md:px-6"}>
+        </div>
+      </header>
+      
+      <main className={isIframe ? "pt-16 py-2 px-2" : "container py-6 px-4 md:py-8 md:px-6"}>
         {children || <Outlet />}
       </main>
     </div>

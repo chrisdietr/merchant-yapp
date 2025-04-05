@@ -295,26 +295,73 @@ This application is designed to be easily embedded in iframes, making it ideal f
 </div>
 ```
 
-3. **Communication with parent window**:
-The application supports message passing with the parent window:
+3. **Advanced embedding with navbar support**:
+```html
+<div id="yapp-container" style="position: relative; width: 100%; height: 600px;">
+  <iframe
+    id="yapp-iframe" 
+    src="https://merchant-yapp.lovable.app"
+    style="width: 100%; height: 100%; border: none;"
+    allow="clipboard-read; clipboard-write; web-share; payment"
+  ></iframe>
+</div>
+
+<script>
+  // Handle iframe sizing and navbar visibility
+  window.addEventListener('message', (event) => {
+    // Make sure the message is from your app
+    if (event.origin !== 'https://merchant-yapp.lovable.app') return;
+    
+    const container = document.getElementById('yapp-container');
+    const iframe = document.getElementById('yapp-iframe');
+    
+    // Handle specific message types
+    if (event.data.type === 'IFRAME_READY' || event.data.type === 'RESIZE') {
+      // Get the height and navbar height from the message
+      const totalHeight = event.data.height || 600;
+      const navbarHeight = event.data.navbarHeight || 0;
+      
+      // Set minimum height to ensure navbar is visible
+      const minHeight = Math.max(totalHeight, 400);
+      
+      // Apply padding to container to account for navbar
+      container.style.paddingTop = navbarHeight + 'px';
+      iframe.style.height = minHeight + 'px';
+    }
+    
+    // Handle URL opening requests
+    if (event.data.type === 'OPEN_URL') {
+      window.open(event.data.url, event.data.target);
+    }
+  });
+</script>
+```
+
+4. **Handling parent window communication**:
+The application sends several types of messages to the parent window:
 
 ```javascript
-// Listen for messages from the iframe
-window.addEventListener('message', (event) => {
-  // Make sure the message is from your app
-  if (event.origin !== 'https://merchant-yapp.lovable.app') return;
-  
-  // Handle specific message types
-  if (event.data.type === 'IFRAME_READY') {
-    console.log('Iframe is ready, height:', event.data.height);
-    // You can adjust iframe height dynamically
-  }
-  
-  if (event.data.type === 'OPEN_URL') {
-    // Handle URL opening requests from the iframe
-    window.open(event.data.url, event.data.target);
-  }
-});
+// Available message types from the iframe
+{
+  // Sent when the iframe is fully loaded and ready
+  type: 'IFRAME_READY',
+  height: 1200,           // Suggested height in pixels
+  navbarHeight: 64        // Height of the navigation bar
+}
+
+// Sent when content size changes
+{
+  type: 'RESIZE',
+  height: 1500,           // New suggested height
+  navbarHeight: 64        // Height of the navigation bar
+}
+
+// Sent when a link should be opened from the iframe
+{
+  type: 'OPEN_URL',
+  url: 'https://example.com',  // URL to open
+  target: '_blank'             // Target (_blank, _self, etc)
+}
 ```
 
 ## ❓ Troubleshooting

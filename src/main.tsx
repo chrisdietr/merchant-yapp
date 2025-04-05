@@ -20,12 +20,24 @@ if (isInIframe()) {
   // Notify parent when we're ready
   window.addEventListener('load', () => {
     try {
-      // Send ready message to parent
-      window.parent.postMessage({ type: 'IFRAME_READY', height: document.documentElement.scrollHeight }, '*');
+      // Calculate additional height needed for navbar
+      const navbarHeight = document.querySelector('header')?.clientHeight || 0;
+      
+      // Send ready message to parent with height including navbar
+      window.parent.postMessage({ 
+        type: 'IFRAME_READY', 
+        height: document.documentElement.scrollHeight,
+        navbarHeight: navbarHeight 
+      }, '*');
       
       // Set up mutation observer to detect height changes
       const observer = new MutationObserver(() => {
-        window.parent.postMessage({ type: 'RESIZE', height: document.documentElement.scrollHeight }, '*');
+        const currentNavbarHeight = document.querySelector('header')?.clientHeight || 0;
+        window.parent.postMessage({ 
+          type: 'RESIZE', 
+          height: document.documentElement.scrollHeight,
+          navbarHeight: currentNavbarHeight
+        }, '*');
       });
       
       // Start observing the body for size changes
