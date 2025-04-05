@@ -100,8 +100,8 @@ export function Layout({ children }: LayoutProps) {
               </div>
             )}
             
-            {/* Simple Sign-In button (desktop only) */}
-            {isConnected && isAdmin && !isAuthenticated && !isMobile && !isIframe && (
+            {/* Simple Sign-In button (show on all devices when not in iframe) */}
+            {isConnected && isAdmin && !isAuthenticated && !isIframe && (
               <Button 
                 variant="outline" 
                 size="sm"
