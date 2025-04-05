@@ -126,7 +126,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </header>
       
-      <main className={isIframe ? "pt-14 py-2 px-2" : "container py-2 px-4 md:py-6 md:px-6"}>
+      <main className={isIframe ? "pt-14 py-2 px-2" : "w-full py-2 px-4 md:py-6 md:px-6"}>
         {children || <Outlet />}
       </main>
     </div>
