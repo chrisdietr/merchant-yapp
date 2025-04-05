@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 import { useAccount, useSignMessage, useDisconnect } from 'wagmi'
 import { SiweMessage } from 'siwe'
 import adminConfig from '../config/admin.json'
+import yodlService from '@/lib/yodl'
 
 interface AuthContextType {
   isAuthenticated: boolean
@@ -39,6 +40,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return savedAdmin === 'true';
   })
   const [isLoading, setIsLoading] = useState(false)
+  
+  // State for automatically connecting via Yodl when in iframe
+  const [yodlAddress, setYodlAddress] = useState<string | null>(null)
+  const [isYodlIframe, setIsYodlIframe] = useState(false)
+  
+  // Check if we're in an iframe on mount
+  useEffect(() => {
+    const isInIframe = yodlService.isInIframe()
+    setIsYodlIframe(isInIframe)
+    
+    // If in iframe, try to get the connected address
+    if (isInIframe) {
+      yodlService.getConnectedAccount().then(account => {
+        if (account) {
+          console.log('Auto-detected Yodl account:', account)
+          setYodlAddress(account)
+          
+          // Check if the account is an admin
+          const adminStatus = checkAdminStatus(account)
+          setIsAdmin(adminStatus)
+        }
+      }).catch(error => {
+        console.error('Failed to get Yodl account:', error)
+      })
+    }
+  }, [])
   
   console.log("ADMIN_ADDRESSES:", adminConfig.admins);
 
@@ -98,148 +125,122 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!adminStatus) {
         setIsAuthenticated(false);
       }
+    } else if (yodlAddress) {
+      // If we have a Yodl address but no wallet address, check if it's an admin
+      const adminStatus = checkAdminStatus(yodlAddress);
+      console.log(`✅ Yodl address ${yodlAddress} admin status: ${adminStatus}`);
+      
+      // Set admin status based on address check
+      setIsAdmin(adminStatus);
     } else {
       // If no wallet is connected, reset both states
       setIsAdmin(false);
       setIsAuthenticated(false);
     }
-  }, [address]);
+  }, [address, yodlAddress]);
 
   // Reset states when wallet disconnects
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && !yodlAddress) {
       setIsAuthenticated(false);
       setIsAdmin(false);
     }
-  }, [isConnected]);
+  }, [isConnected, yodlAddress]);
 
+  // Sign-in function - handles both regular wallet and Yodl iframe scenarios
   const signIn = async (): Promise<boolean> => {
-    if (!address) {
-      console.error('Cannot sign in: No address available')
-      return false
-    }
-    
-    setIsLoading(true)
-    console.log('Starting authentication process...')
-
     try {
-      // Check if this address could potentially be an admin
-      const isAddressAdmin = checkAdminStatus(address);
+      setIsLoading(true);
       
-      if (!isAddressAdmin) {
-        console.log("Address is not recognized as admin, skipping sign-in");
-        setIsLoading(false);
-        return false;
-      }
-      
-      // Create a challenge message for the user to sign
-      const domain = window.location.host;
-      const origin = window.location.origin;
-      const nonce = Math.floor(Math.random() * 1000000).toString();
-      const statement = 'Sign this message to authenticate as admin for Merchant Yapp.';
-      
-      // Create message to sign
-      const messageToSign = `${domain} wants you to sign in with your Ethereum account:
-${address}
-
-${statement}
-
-URI: ${origin}
-Nonce: ${nonce}
-Issued At: ${new Date().toISOString()}`;
-
-      console.log('Requesting signature for message:', messageToSign);
-      
-      try {
-        // Request user to sign the message - THIS IS THE CRITICAL SECURITY STEP
-        const signature = await signMessageAsync({ 
-          message: messageToSign,
-          account: address as `0x${string}`
-        });
-        
-        console.log('Signature received:', signature.slice(0, 10) + '...');
-        
-        // Verify the signature locally
-        // Note: In a production app, you'd verify this on the server
-        if (signature) {
-          console.log('Signature verified successfully');
+      // If in Yodl iframe mode and we have a Yodl address
+      if (isYodlIframe && yodlAddress) {
+        try {
+          // Create SIWE message
+          const message = new SiweMessage({
+            domain: window.location.host,
+            address: yodlAddress as `0x${string}`,
+            statement: 'Sign in to Merchant Yapp with Yodl',
+            uri: window.location.origin,
+            version: '1',
+            chainId: 1, // Default to Ethereum mainnet
+            nonce: Math.floor(Math.random() * 1000000).toString(), // Generate random nonce
+          }).prepareMessage();
           
-          // Set authentication status ONLY after successful signature
-          setIsAuthenticated(true);
+          // Sign message using Yodl SDK
+          const signature = await yodlService.signMessage(message);
           
-          console.log(`Authentication completed. Admin status: ${isAddressAdmin}`);
-          setIsLoading(false);
-          return true;
-        } else {
-          throw new Error('Invalid signature');
+          // If we got a signature, consider authentication successful
+          if (signature) {
+            setIsAuthenticated(true);
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error('Error signing message with Yodl:', error);
+          return false;
         }
-      } catch (signError) {
-        console.error('Error during message signing:', signError);
-        setIsAuthenticated(false);
-        throw new Error('User rejected signature or signing failed');
       }
+      
+      // Regular wallet flow
+      else if (address && isConnected) {
+        // Create SIWE message
+        const message = new SiweMessage({
+          domain: window.location.host,
+          address: address,
+          statement: 'Sign in to Merchant Yapp with Ethereum',
+          uri: window.location.origin,
+          version: '1'
+        }).prepareMessage();
+        
+        // Request signature via wagmi
+        const signature = await signMessageAsync({ message });
+        
+        if (signature) {
+          setIsAuthenticated(true);
+          return true;
+        }
+      }
+      
+      return false;
     } catch (error) {
-      console.error('Sign in error:', error);
-      setIsAuthenticated(false);
+      console.error('Error during sign-in:', error);
       return false;
     } finally {
       setIsLoading(false);
     }
-  }
+  };
 
-  const signOut = async () => {
-    try {
-      console.log('Signing out...')
-      
-      // Update state
-      setIsAuthenticated(false)
-      
-      // Clear localStorage
-      localStorage.removeItem(STORAGE_KEYS.AUTH_STATUS);
-      localStorage.removeItem(STORAGE_KEYS.ADMIN_MODE);
-      
-      // Disconnect wallet
-      disconnect()
-    } catch (error) {
-      console.error('Sign out error:', error)
-    }
-  }
-
-  // Function to manually set admin status (only in development)
-  const updateIsAdmin = (value: boolean) => {
-    console.log(`Setting admin status to: ${value}`);
-    setIsAdmin(value);
-    if (!value) {
-      // If turning off admin, also turn off authentication
-      setIsAuthenticated(false);
+  // Sign-out function
+  const signOut = () => {
+    setIsAuthenticated(false);
+    if (!isAdmin) {
+      disconnect();
     }
   };
 
-  // In development mode only, include setIsAdmin
-  const isDev = process.env.NODE_ENV === 'development'
+  // Combine regular wallet address and Yodl address for context
+  const effectiveAddress = address || (yodlAddress as `0x${string}` | undefined);
 
   return (
     <AuthContext.Provider
       value={{
         isAuthenticated,
         isAdmin,
-        address,
+        address: effectiveAddress,
         signIn,
         signOut,
         isLoading,
-        // Only expose setIsAdmin in development mode
-        ...(isDev && { setIsAdmin: updateIsAdmin }),
       }}
     >
       {children}
     </AuthContext.Provider>
-  )
+  );
 }
 
-export function useAuth() {
-  const context = useContext(AuthContext)
+export const useAuth = (): AuthContextType => {
+  const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
+    throw new Error('useAuth must be used within an AuthProvider');
   }
-  return context
-} 
+  return context;
+}; 

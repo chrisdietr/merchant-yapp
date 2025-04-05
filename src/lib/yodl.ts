@@ -1,16 +1,37 @@
 import YappSDK, { FiatCurrency, Payment, isInIframe } from '@yodlpay/yapp-sdk';
 import { WALLET_ADDRESS } from '../config/yodl';
 
+// Add SDK method extensions for TypeScript
+interface ExtendedYappSDK extends YappSDK {
+  getAccount?: () => Promise<string | null>;
+  signMessage?: (message: string) => Promise<string>;
+  getPendingPayments?: (address: string) => Promise<Payment[]>;
+}
+
 // Singleton instance of the YappSDK
 class YodlService {
   private static instance: YodlService;
-  private sdk: YappSDK;
+  private sdk: ExtendedYappSDK;
+  private connectedAccount: string | null = null;
 
   private constructor() {
     // Initialize the SDK with default configuration
-    this.sdk = new YappSDK();
+    this.sdk = new YappSDK() as ExtendedYappSDK;
+    
+    // Try to get the connected account if in iframe
+    if (this.isInIframe()) {
+      this.getConnectedAccount().then(account => {
+        if (account) {
+          console.log("Auto-detected connected account in Yodl iframe:", account);
+          this.connectedAccount = account;
+        }
+      }).catch(error => {
+        console.error("Failed to get connected account from Yodl:", error);
+      });
+    }
   }
 
+  // Get singleton instance
   public static getInstance(): YodlService {
     if (!YodlService.instance) {
       YodlService.instance = new YodlService();
@@ -22,10 +43,91 @@ class YodlService {
   public isInIframe(): boolean {
     return isInIframe();
   }
+  
+  // Get the currently connected account from Yodl context
+  public async getConnectedAccount(): Promise<string | null> {
+    if (!this.isInIframe()) {
+      return null;
+    }
+    
+    try {
+      // Try to get the connected account from Yodl SDK
+      if (this.sdk.getAccount) {
+        const account = await this.sdk.getAccount();
+        return account;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error getting connected account from Yodl:", error);
+      return null;
+    }
+  }
+  
+  // Get the cached connected account (or fetch fresh if not cached)
+  public async getConnectedAccountCached(): Promise<string | null> {
+    if (this.connectedAccount) {
+      return this.connectedAccount;
+    }
+    
+    const account = await this.getConnectedAccount();
+    if (account) {
+      this.connectedAccount = account;
+    }
+    return account;
+  }
+  
+  // Sign a message using the Yodl SDK
+  public async signMessage(message: string): Promise<string> {
+    if (!this.isInIframe()) {
+      throw new Error("Not in an iframe, cannot use Yodl SDK signing");
+    }
+    
+    try {
+      // Sign the message using Yodl SDK
+      if (this.sdk.signMessage) {
+        const signature = await this.sdk.signMessage(message);
+        return signature;
+      }
+      throw new Error("signMessage method not available in this SDK version");
+    } catch (error) {
+      console.error("Error signing message with Yodl SDK:", error);
+      throw error;
+    }
+  }
 
-  // Generate a unique memo for the payment
-  private generateMemo(orderId?: string): string {
-    return orderId ? `order_${orderId}_${Date.now()}` : `payment_${Date.now()}`;
+  // Generate a unique memo for order identification
+  public generateMemo(orderId?: string): string {
+    if (orderId) {
+      return orderId;
+    }
+    
+    // Generate a unique ID
+    return `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+  }
+
+  // Store information about an order in localStorage
+  public storeOrderInfo(orderId: string, info: any): void {
+    try {
+      const storageKey = `order_info_${orderId}`;
+      localStorage.setItem(storageKey, JSON.stringify(info));
+      console.log(`Stored order info for ${orderId}:`, info);
+    } catch (error) {
+      console.error('Failed to store order info:', error);
+    }
+  }
+
+  // Get stored order information from localStorage
+  public getOrderInfo(orderId: string): any {
+    try {
+      const storageKey = `order_info_${orderId}`;
+      const data = localStorage.getItem(storageKey);
+      if (data) {
+        return JSON.parse(data);
+      }
+    } catch (error) {
+      console.error('Failed to get order info:', error);
+    }
+    return null;
   }
 
   // Request a payment using SDK directly
@@ -66,37 +168,43 @@ class YodlService {
     }
   }
 
-  // Store order info in localStorage - changed from private to public
-  public storeOrderInfo(orderId: string, orderInfo: any): void {
+  // Parse payment details from URL (used after redirect)
+  public parsePaymentFromUrl(): Payment | null {
     try {
-      // Get existing orders or initialize empty object
-      const existingOrders = localStorage.getItem('yodl_orders');
-      const orders = existingOrders ? JSON.parse(existingOrders) : {};
+      // Check for URL parameters
+      const params = new URLSearchParams(window.location.search);
       
-      // Add this order
-      orders[orderId] = {
-        ...(orders[orderId] || {}),  // Keep existing data if any
-        ...orderInfo                 // Update with new data
-      };
+      // Get payment details from URL
+      const txHash = params.get('txHash');
+      const chainIdStr = params.get('chainId');
       
-      // Save back to localStorage
-      localStorage.setItem('yodl_orders', JSON.stringify(orders));
+      if (txHash && chainIdStr) {
+        const chainId = parseInt(chainIdStr, 10);
+        
+        // Return payment object
+        return {
+          txHash: txHash as `0x${string}`,
+          chainId,
+        };
+      }
     } catch (error) {
-      console.error('Error storing order info:', error);
+      console.error('Failed to parse payment from URL:', error);
     }
+    
+    return null;
   }
 
-  // Get order info from localStorage
-  public getOrderInfo(orderId: string): any {
+  // Clean payment parameters from URL
+  public cleanPaymentUrl(): void {
     try {
-      const orders = localStorage.getItem('yodl_orders');
-      if (!orders) return null;
+      // Remove payment parameters from URL without page reload
+      const url = new URL(window.location.href);
+      url.searchParams.delete('txHash');
+      url.searchParams.delete('chainId');
       
-      const parsedOrders = JSON.parse(orders);
-      return parsedOrders[orderId] || null;
+      window.history.replaceState({}, document.title, url.toString());
     } catch (error) {
-      console.error('Error retrieving order info:', error);
-      return null;
+      console.error('Failed to clean payment URL:', error);
     }
   }
 
@@ -126,25 +234,21 @@ class YodlService {
     }
   }
 
-  // Parse payment from URL (for redirect flow)
-  public parsePaymentFromUrl(): Payment | null {
-    const result = this.sdk.parsePaymentFromUrl();
-    
-    // The SDK method returns a partial payment object that might be null
-    // Only return a valid Payment object if it has the required properties
-    if (result && result.txHash && result.chainId) {
-      return result as Payment;
+  // Check for pending payments
+  public async checkPendingPayments(
+    paymentAddress: string = WALLET_ADDRESS
+  ): Promise<Payment[]> {
+    try {
+      // Get pending payments for the address
+      if (this.sdk.getPendingPayments) {
+        const pendingPayments = await this.sdk.getPendingPayments(paymentAddress);
+        return pendingPayments;
+      }
+      return [];
+    } catch (error) {
+      console.error('Failed to get pending payments:', error);
+      return [];
     }
-    
-    return null;
-  }
-
-  // Clean payment parameters from URL
-  public cleanPaymentUrl(): void {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('txHash');
-    url.searchParams.delete('chainId');
-    window.history.replaceState({}, document.title, url.toString());
   }
 
   // Close the Yapp (for iframe mode)
@@ -193,51 +297,29 @@ class YodlService {
       
       let lastError = null;
       
-      // Try each endpoint until one works
-      for (const apiUrl of apiEndpoints) {
+      for (const endpoint of apiEndpoints) {
         try {
-          console.log(`Trying API URL: ${apiUrl}`);
-          
-          const response = await fetch(apiUrl);
-          
-          // If not successful, try the next endpoint
-          if (!response.ok) {
-            console.warn(`API endpoint ${apiUrl} returned status: ${response.status}`);
-            lastError = new Error(`API returned status: ${response.status}`);
-            continue;
-          }
-          
-          // Parse response data
-          const data = await response.json();
-          console.log('API response data:', data);
-          
-          // Different endpoints return different data structures
-          // Handle both transaction-wrapped and direct payment data
-          if (data && data.transaction) {
-            return data.transaction;
-          } else if (data && (data.amount || data.status || data.timestamp)) {
+          const response = await fetch(endpoint);
+          if (response.ok) {
+            const data = await response.json();
+            console.log('Payment details retrieved from API:', data);
             return data;
           }
-          
-          // If we get here but data seems incomplete, try next endpoint
-          console.warn('Data from API appears incomplete, trying next endpoint');
-        } catch (endpointError) {
-          console.warn(`Error with endpoint ${apiUrl}:`, endpointError);
-          lastError = endpointError;
+        } catch (error) {
+          console.warn(`API endpoint ${endpoint} failed:`, error);
+          lastError = error;
         }
       }
       
-      // If we've tried all endpoints and none worked, throw the last error
-      if (lastError) {
-        throw lastError;
-      }
-      
-      throw new Error('All API endpoints failed');
+      // If we got here, all endpoints failed
+      throw lastError || new Error('All API endpoints failed to retrieve payment details');
     } catch (error) {
-      console.error('Error fetching payment details:', error);
+      console.error('Failed to fetch payment details:', error);
       throw error;
     }
   }
 }
 
-export default YodlService.getInstance(); 
+// Export singleton instance
+const yodlService = YodlService.getInstance();
+export default yodlService; 

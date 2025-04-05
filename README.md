@@ -373,7 +373,7 @@ The application sends several types of messages to the parent window:
 ### Common Issues
 
 1. **Admin features not showing**: 
-   - Ensure your wallet address in `admin.json` is lowercase
+   - Ensure your wallet address or ENS in `admin.json` is lowercase
    - Check that you've connected with the correct wallet
    - Verify you've signed the authentication message
 

@@ -1,11 +1,11 @@
 import { ThemeToggle } from "@/components/ThemeToggle"
-import { ConnectButton } from "@rainbow-me/rainbowkit"
 import { useAccount } from "wagmi"
 import { useAuth } from "@/contexts/AuthContext"
 import { Button } from "./ui/button"
 import { Link, useLocation, Outlet } from "react-router-dom"
 import { useState, useEffect } from "react"
 import { isInIframe } from "@/lib/utils"
+import { ConnectWalletButton } from "./ConnectWalletButton"
 
 interface LayoutProps {
   children?: React.ReactNode
@@ -101,7 +101,7 @@ export function Layout({ children }: LayoutProps) {
             )}
             
             {/* Simple Sign-In button (desktop only) */}
-            {isConnected && isAdmin && !isAuthenticated && !isMobile && (
+            {isConnected && isAdmin && !isAuthenticated && !isMobile && !isIframe && (
               <Button 
                 variant="outline" 
                 size="sm"
@@ -116,13 +116,8 @@ export function Layout({ children }: LayoutProps) {
             {/* Theme toggle before wallet connect */}
             <ThemeToggle />
             
-            {/* Use the standard ConnectButton with minimal options (rightmost) */}
-            <ConnectButton 
-              showBalance={false}
-              chainStatus="none"
-              accountStatus={isMobile ? "avatar" : "address"}
-              label="Connect"
-            />
+            {/* Use our custom ConnectWalletButton that handles Yodl iframe scenarios */}
+            <ConnectWalletButton />
           </div>
         </div>
       </header>
