@@ -13,10 +13,24 @@ class YodlService {
   private static instance: YodlService;
   private sdk: ExtendedYappSDK;
   private connectedAccount: string | null = null;
+  private isEthereumAvailable: boolean = false;
 
   private constructor() {
-    // Initialize the SDK with default configuration
+    // Check if ethereum is available before initializing
+    try {
+      // Simply check if window.ethereum exists without trying to modify it
+      this.isEthereumAvailable = typeof window !== 'undefined' && 
+                                window.ethereum !== undefined && 
+                                window.ethereum !== null;
+    } catch (error) {
+      console.warn("Unable to detect Ethereum provider:", error);
+      this.isEthereumAvailable = false;
+    }
+
+    // Initialize the SDK - avoid using configuration options that might not be supported
+    // Instead, initialize the basic SDK and handle iframe-specific behavior in our code
     this.sdk = new YappSDK() as ExtendedYappSDK;
+    console.log("Initializing YodlService in " + (this.isInIframe() ? "iframe" : "normal") + " mode");
     
     // Try to get the connected account if in iframe
     if (this.isInIframe()) {

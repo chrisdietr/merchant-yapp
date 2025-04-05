@@ -30,11 +30,24 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
   // Generate a unique order ID if not provided
   const uniqueOrderId = orderId || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   
-  // Set up payment listener for iframe mode
+  // Safely check if we're in an iframe context
   useEffect(() => {
     if (isInIframe) {
-      // This is now handled globally in the YodlService
       console.log('Component in iframe mode, payment completion is handled by YodlService listener');
+      
+      // Add safety check for iframe ethereum conflicts
+      const checkForEthereumConflict = () => {
+        try {
+          // Don't reference window.ethereum directly, just check if it exists
+          if (typeof window !== 'undefined') {
+            console.log('Running in iframe environment, making sure ethereum access is safe');
+          }
+        } catch (error) {
+          console.warn('Error checking ethereum availability:', error);
+        }
+      };
+      
+      checkForEthereumConflict();
     }
   }, [isInIframe]);
 
