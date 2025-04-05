@@ -45,13 +45,6 @@ const ConfirmationPage: React.FC = () => {
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
   
-  // Product name map for display
-  const productMap: {[key: string]: string} = {
-    "1": "T-Shirt",
-    "2": "Coffee",
-    "3": "Hat"
-  };
-
   // Check if device is mobile
   useEffect(() => {
     const checkIsMobile = () => {
@@ -404,13 +397,7 @@ const ConfirmationPage: React.FC = () => {
       const productId = order.orderId.split('_')[1];
       console.log('Extracted productId from orderId:', productId);
       
-      // Check if we have a mapping in our product map
-      if (productMap[productId]) {
-        console.log('Found in productMap:', productMap[productId]);
-        return productMap[productId];
-      }
-      
-      // Try to find from shops data
+      // Try to find from shops data first (most accurate source)
       const productFromShops = shopsData.products.find((p: any) => p.id === productId);
       if (productFromShops) {
         console.log('Found in shopsData:', productFromShops.name);
