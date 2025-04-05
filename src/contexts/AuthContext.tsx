@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { useAccount, useSignMessage, useDisconnect } from 'wagmi'
+import { useAccount, useSignMessage, useDisconnect, useChainId } from 'wagmi'
 import { SiweMessage } from 'siwe'
 import adminConfig from '../config/admin.json'
 import yodlService from '@/lib/yodl'
@@ -33,6 +33,7 @@ const STORAGE_KEYS = {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { address, isConnected } = useAccount()
+  const chainId = useChainId() || 1
   const { signMessageAsync } = useSignMessage()
   const { disconnect } = useDisconnect()
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -206,17 +207,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       // Regular wallet flow
       else if (address && isConnected) {
-        // Create SIWE message
-        const message = new SiweMessage({
-          domain: window.location.host,
-          address: address,
-          statement: 'Sign in to Merchant Yapp with Ethereum',
-          uri: window.location.origin,
-          version: '1'
-        }).prepareMessage();
-        
-        // Request signature via wagmi - ensure we pass the account
         try {
+          // Create SIWE message with explicit chainId
+          const nonce = Math.floor(Math.random() * 1000000).toString();
+          console.log(`Creating SIWE message with chainId: ${chainId} and nonce: ${nonce}`);
+          
+          const message = new SiweMessage({
+            domain: window.location.host,
+            address: address,
+            statement: 'Sign in to Merchant Yapp with Ethereum',
+            uri: window.location.origin,
+            version: '1',
+            chainId,
+            nonce,
+          }).prepareMessage();
+          
+          console.log('Prepared SIWE message:', message);
+          
+          // Request signature via wagmi - ensure we pass the account
           const signature = await signMessageAsync({ 
             message,
             account: address
@@ -226,8 +234,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setIsAuthenticated(true);
             return true;
           }
+          
+          return false;
         } catch (error) {
           console.error('Error during signature:', error);
+          return false;
         }
       }
       
