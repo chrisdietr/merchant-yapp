@@ -1,4 +1,4 @@
-import { clsx, type ClassValue } from "clsx"
+import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import shopsData from "@/config/shops.json"
 import { Shop } from "./types"
@@ -8,24 +8,21 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Get shop information by owner address
- * @param ownerAddress Ethereum address of the shop owner
- * @returns Shop information or null if not found
+ * Look up a shop by owner address
+ * @param ownerAddress The owner's Ethereum address
+ * @returns The shop object or null if not found
  */
 export function getShopByOwnerAddress(ownerAddress: string): Shop | null {
-  // Just return the first shop from shops data since we're
-  // now using the admin wallet address as the owner
-  const shop = shopsData.shops[0];
+  if (!ownerAddress || !shopsData.shops) return null;
   
-  if (!shop) {
-    return null;
-  }
+  const normalizedAddress = ownerAddress.toLowerCase();
+  const shop = shopsData.shops.find(
+    (shop: Shop) => 
+      shop.ownerAddress && 
+      shop.ownerAddress.toLowerCase() === normalizedAddress
+  );
   
-  return {
-    ...shop,
-    // Ensure the ownerAddress is set to the passed address for compatibility
-    ownerAddress: ownerAddress
-  };
+  return shop || null;
 }
 
 /**

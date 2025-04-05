@@ -372,11 +372,13 @@ const ConfirmationPage: React.FC = () => {
       shopName = shopsData.shops[0].name || 'your shop';
     }
     
-    // Debug the shop name
-    console.log('Shop name for message:', shopName, 'Product name:', productName);
+    // Add transaction receipt link if available
+    let receiptLink = '';
+    if (order.txHash) {
+      receiptLink = `\n\nHere is the receipt: yodl.me/tx/${order.txHash}`;
+    }
     
-    // Remove order link from the message
-    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from?`;
+    return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from?${receiptLink}`;
   };
 
   // Find product emoji from productId in the orderId
@@ -626,17 +628,9 @@ const ConfirmationPage: React.FC = () => {
                 return (
                   <Button 
                     onClick={() => {
-                      // First save confirmation to gallery
-                      saveConfirmation().then(() => {
-                        // Then open Telegram with prepopulated message in appropriate context
-                        const telegramUrl = generateTelegramLink(telegramHandle, getTelegramMessage());
-                        openUrl(telegramUrl);
-                      }).catch(error => {
-                        console.error('Error saving image before opening Telegram:', error);
-                        // Still open Telegram even if saving fails
-                        const telegramUrl = generateTelegramLink(telegramHandle, getTelegramMessage());
-                        openUrl(telegramUrl);
-                      });
+                      // Open Telegram with prepopulated message without saving image first
+                      const telegramUrl = generateTelegramLink(telegramHandle, getTelegramMessage());
+                      openUrl(telegramUrl);
                     }}
                     className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full"
                   >

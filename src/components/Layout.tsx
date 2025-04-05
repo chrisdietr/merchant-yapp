@@ -71,8 +71,8 @@ export function Layout({ children }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300" style={iframeStyles}>
-      {/* Always show header, even in iframe, but with adjusted styling */}
-      <header className={`sticky ${isIframe ? 'top-10' : 'top-0'} z-50 border-b border-purple-200/50 dark:border-white/15 bg-white/90 dark:bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-background/60`}>
+      {/* Always show header, using fixed positioning for all views */}
+      <header className="fixed top-0 left-0 right-0 z-50 border-b border-purple-200/50 dark:border-white/15 bg-white/95 dark:bg-background/95 backdrop-blur-lg supports-[backdrop-filter]:bg-white/80 dark:supports-[backdrop-filter]:bg-background/80 shadow-sm">
         <div className="container flex h-14 md:h-16 items-center justify-between relative px-4 sm:px-6">
           {/* Title container with proper height and vertical alignment */}
           <div className="flex items-center h-14 md:h-16">
@@ -126,7 +126,8 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </header>
       
-      <main className={isIframe ? "pt-14 py-2 px-2" : "w-full py-2 px-2 md:px-3"}>
+      {/* Add padding to the top of the main content to account for the fixed header */}
+      <main className={isIframe ? "pt-16 pb-2 px-2" : "pt-16 w-full py-2 px-2 md:px-3"}>
         {children || <Outlet />}
       </main>
     </div>
