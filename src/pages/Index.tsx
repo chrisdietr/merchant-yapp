@@ -34,7 +34,7 @@ export default function Index() {
   }
 
   return (
-    <div className="w-full max-w-full py-4 md:py-8">
+    <div className="w-full max-w-full py-4 md:py-8 px-2 md:px-3">
       <div className="mb-4 md:mb-8 pl-1">
         {/* Admin Scanner Button - only visible for admins */}
         {hasAdminAccess && (
@@ -60,7 +60,7 @@ export default function Index() {
         
         <h1 className="text-xl font-medium text-left">Products</h1>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 md:gap-4 px-0 max-w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-5 px-0 max-w-full">
         {products.map((product) => (
           <ProductCard
             key={product.id}
