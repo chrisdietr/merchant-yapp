@@ -26,7 +26,7 @@ export function ProductCard({ product }: ProductCardProps) {
 
   // Get the shop's owner address from the first shop in the array
   // This replaces the need for an owner field in each product
-  const shopOwnerAddress = shopsData.shops[0]?.ownerAddress || "";
+  const shopOwnerAddress = shopsData.shops[0]?.["ownerAddress"] || "";
 
   // Convert the product currency to FiatCurrency enum
   const getCurrency = (currency: string): FiatCurrency => {
@@ -47,16 +47,16 @@ export function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <Card className="w-full max-w-[95%] mx-auto md:max-w-none h-full flex flex-col gradient-card text-card-foreground border border-white/10 hover:shadow-xl hover:shadow-purple-500/30">
-      <CardHeader className="pb-2">
-        <CardTitle className="flex items-center gap-2 md:gap-3 text-xl md:text-2xl">
+    <Card className="w-full max-w-[98%] mx-auto md:max-w-none h-full flex flex-col gradient-card text-card-foreground border border-white/10 hover:shadow-xl hover:shadow-purple-500/30">
+      <CardHeader className="pb-3 md:pb-2">
+        <CardTitle className="flex items-center gap-3 md:gap-3 text-xl md:text-2xl">
           <span className="text-3xl md:text-4xl bg-white/15 p-2 rounded-full flex-shrink-0">{product.emoji}</span>
           <span className="font-bold">{product.name}</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="pb-4 flex-grow">
-        <p className="text-xs md:text-sm text-card-foreground/80 mb-2">{product.description}</p>
-        <p className="text-lg md:text-xl font-bold text-white">
+      <CardContent className="pb-5 md:pb-4 flex-grow">
+        <p className="text-sm md:text-sm text-card-foreground/80 mb-3 md:mb-2">{product.description}</p>
+        <p className="text-lg md:text-xl font-bold text-white mb-3 md:mb-2">
           {product.price} {product.currency}
         </p>
         <div className="mt-2">

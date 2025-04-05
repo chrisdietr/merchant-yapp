@@ -34,8 +34,8 @@ export default function Index() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8">
+    <div className="container mx-auto py-4 md:py-8">
+      <div className="mb-4 md:mb-8">
         <div className="flex justify-between items-center">
           {/* Admin Scanner Button - only visible for admins */}
           {hasAdminAccess && (
@@ -60,13 +60,13 @@ export default function Index() {
           )}
         </div>
         
-        {/* Empty space for 2 lines */}
-        <div className="h-8"></div>
+        {/* Reduced empty space for mobile */}
+        <div className="h-2 md:h-4"></div>
         
         {/* Smaller title */}
         <h1 className="text-xl font-medium">Products</h1>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 px-2 md:px-0">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-6 px-1 md:px-0">
         {products.map((product) => (
           <ProductCard
             key={product.id}

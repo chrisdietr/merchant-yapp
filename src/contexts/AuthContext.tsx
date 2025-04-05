@@ -231,20 +231,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const nonce = Math.floor(Math.random() * 1000000).toString();
           console.log(`Creating SIWE message with chainId: ${chainId} and nonce: ${nonce}`);
           
-          const message = new SiweMessage({
-            domain: window.location.host,
-            address: address,
-            statement: 'Sign in to Merchant Yapp with Ethereum',
-            uri: window.location.origin,
-            version: '1',
-            chainId,
-            // Use nonce as a field, not within the message
-            nonce,
-          });
-          
-          // Prepare the message after setting all parameters
-          const preparedMessage = message.prepareMessage();
-          console.log('Prepared SIWE message:', preparedMessage);
+          // Format the SIWE message properly - create simple text format first
+          const messageText = `${window.location.host} wants you to sign in with your Ethereum account:
+${address}
+
+Sign in to Merchant Yapp with Ethereum
+
+URI: ${window.location.origin}
+Version: 1
+Chain ID: ${chainId}
+Nonce: ${nonce}
+Issued At: ${new Date().toISOString()}`;
+
+          console.log('Prepared SIWE message:', messageText);
           
           // SECURITY FIX: Always require signature verification
           let signature: string | undefined;
@@ -255,7 +254,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
               // Sign the message using the connected wallet
               signature = await signMessageAsync({
-                message: preparedMessage,
+                message: messageText,
                 account: address
               });
             } catch (error) {
@@ -266,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             try {
               // Sign the message using the connected wallet
               signature = await signMessageAsync({
-                message: preparedMessage,
+                message: messageText,
                 account: address
               });
             } catch (error) {
