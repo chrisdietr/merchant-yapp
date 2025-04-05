@@ -34,8 +34,8 @@ export default function Index() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8">
+    <div className="container mx-auto py-4">
+      <div className="mb-4">
         <div className="flex justify-between items-center">
           {/* Admin Scanner Button - only visible for admins */}
           {hasAdminAccess && (
@@ -58,15 +58,14 @@ export default function Index() {
               </svg>
             </Link>
           )}
+          
+          {/* Title moved to header for better spacing */}
+          <h1 className="text-xl font-medium ml-2">Products</h1>
         </div>
-        
-        {/* Empty space for 2 lines */}
-        <div className="h-8"></div>
-        
-        {/* Smaller title */}
-        <h1 className="text-xl font-medium">Products</h1>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      
+      {/* Responsive grid that adapts to screen size */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 sm:gap-4 md:gap-5">
         {products.map((product) => (
           <ProductCard
             key={product.id}
