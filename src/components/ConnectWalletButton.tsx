@@ -12,6 +12,7 @@ export function ConnectWalletButton() {
   const [yodlAddress, setYodlAddress] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [walletConnected, setWalletConnected] = useState(false);
 
   // Check if we're in an iframe on mount
   useEffect(() => {
@@ -47,6 +48,13 @@ export function ConnectWalletButton() {
       window.removeEventListener('resize', checkIsMobile);
     };
   }, [isAdmin, isAuthenticated, signIn]);
+
+  // Effect to update wallet connected state when isConnected changes
+  useEffect(() => {
+    if (isConnected) {
+      setWalletConnected(true);
+    }
+  }, [isConnected]);
   
   // Handle sign in with proper loading state
   const handleSignIn = async () => {
@@ -115,7 +123,25 @@ export function ConnectWalletButton() {
             })}
           >
             {(() => {
-              if (!mounted || !account || !chain) {
+              // Show connect button if not mounted OR (not account AND not walletConnected)
+              // This ensures the connect button stays visible even if account disappears after
+              // a failed/cancelled authentication
+              if (!mounted || (!account && !walletConnected)) {
+                return (
+                  <Button 
+                    onClick={openConnectModal} 
+                    variant="outline"
+                    size={isMobile ? "xs" : "sm"}
+                    className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10"
+                  >
+                    Connect
+                  </Button>
+                );
+              }
+
+              // If wallet was connected but account isn't available (e.g., after a failed login)
+              // still show the connect button
+              if (walletConnected && !account) {
                 return (
                   <Button 
                     onClick={openConnectModal} 
@@ -128,6 +154,7 @@ export function ConnectWalletButton() {
                 );
               }
               
+              // If we have an account, show the normal UI
               return (
                 <div className="flex items-center gap-1 md:gap-2">
                   {isAdmin && !isAuthenticated && (
@@ -148,7 +175,7 @@ export function ConnectWalletButton() {
                   >
                     <span className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-green-500 mr-1 md:mr-2"></span>
                     <span className="truncate max-w-[80px] md:max-w-[120px]">
-                      {account.displayName}
+                      {account?.displayName || "Connect"}
                     </span>
                   </button>
                 </div>
