@@ -47,24 +47,35 @@ class YodlService {
 
   // Check if running in iframe
   public isInIframe(): boolean {
-    return isInIframe();
+    try {
+      return isInIframe();
+    } catch (error) {
+      console.warn('Error checking iframe status:', error);
+      // If we can't determine for sure, assume not in iframe for safety
+      return false;
+    }
   }
   
   // Get the currently connected account from Yodl context
   public async getConnectedAccount(): Promise<string | null> {
-    if (!this.isInIframe()) {
-      return null;
-    }
-    
     try {
-      // Try to get the connected account from Yodl SDK
-      if (this.sdk.getAccount) {
-        const account = await this.sdk.getAccount();
-        return account;
+      if (!this.isInIframe()) {
+        return null;
       }
-      return null;
-    } catch (error) {
-      console.error("Error getting connected account from Yodl:", error);
+      
+      try {
+        // Try to get the connected account from Yodl SDK
+        if (this.sdk.getAccount) {
+          const account = await this.sdk.getAccount();
+          return account;
+        }
+        return null;
+      } catch (error) {
+        console.error("Error getting connected account from Yodl:", error);
+        return null;
+      }
+    } catch (e) {
+      console.warn('Error in getConnectedAccount:', e);
       return null;
     }
   }
@@ -195,6 +206,48 @@ class YodlService {
     }
   }
   
+  // Helper method to safely serialize data for postMessage
+  private _safePostMessage(targetWindow: Window, data: any, targetOrigin: string): void {
+    try {
+      // Deep clone and remove any URL objects or other non-serializable items
+      const safeData = this._makeDataPostMessageSafe(data);
+      targetWindow.postMessage(safeData, targetOrigin);
+    } catch (error) {
+      console.warn('Failed to post message safely:', error);
+    }
+  }
+
+  // Makes data safe for postMessage by removing URL objects and other non-serializable data
+  private _makeDataPostMessageSafe(data: any): any {
+    if (!data) return data;
+    
+    if (typeof data !== 'object') return data;
+    
+    // Handle arrays
+    if (Array.isArray(data)) {
+      return data.map(item => this._makeDataPostMessageSafe(item));
+    }
+    
+    // Handle objects
+    const result: any = {};
+    for (const key in data) {
+      if (Object.prototype.hasOwnProperty.call(data, key)) {
+        const value = data[key];
+        
+        // Skip URL objects
+        if (value instanceof URL) {
+          result[key] = value.toString(); // Convert URL to string
+        } else if (typeof value === 'object' && value !== null) {
+          result[key] = this._makeDataPostMessageSafe(value);
+        } else {
+          result[key] = value;
+        }
+      }
+    }
+    
+    return result;
+  }
+
   // Poll for payment status as an alternative to redirects in iframe mode
   private _setupPaymentStatusPolling(orderId: string, webhookId: string, attempts = 0): void {
     // Maximum number of polling attempts (5 minutes at 5-second intervals)
@@ -219,13 +272,17 @@ class YodlService {
           
           // Refresh the page or update UI as needed
           // But avoid redirect in iframe context
-          if (this.isInIframe()) {
-            // Post message to parent to update UI
-            window.parent.postMessage({
-              type: 'PAYMENT_COMPLETED',
-              orderId,
-              success: true
-            }, '*');
+          try {
+            if (this.isInIframe()) {
+              // Post message to parent to update UI
+              this._safePostMessage(window.parent, {
+                type: 'PAYMENT_COMPLETED',
+                orderId,
+                success: true
+              }, '*');
+            }
+          } catch (postError) {
+            console.warn('Error posting message to parent:', postError);
           }
           return;
         }
@@ -246,13 +303,17 @@ class YodlService {
           if (matchingPayment) {
             console.log(`Found matching payment for ${orderId}:`, matchingPayment);
             // Handle successful payment
-            if (this.isInIframe()) {
-              window.parent.postMessage({
-                type: 'PAYMENT_COMPLETED',
-                orderId,
-                success: true,
-                payment: matchingPayment
-              }, '*');
+            try {
+              if (this.isInIframe()) {
+                this._safePostMessage(window.parent, {
+                  type: 'PAYMENT_COMPLETED',
+                  orderId,
+                  success: true,
+                  payment: matchingPayment
+                }, '*');
+              }
+            } catch (postError) {
+              console.warn('Error posting message to parent:', postError);
             }
             return;
           }
