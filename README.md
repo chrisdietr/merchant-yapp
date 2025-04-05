@@ -268,6 +268,55 @@ yarn build
 2. The build output will be in the `dist` directory
 3. Deploy this directory to your web hosting service
 
+### Iframe Embedding
+
+This application is designed to be easily embedded in iframes, making it ideal for integration with other websites:
+
+1. **Basic embedding**:
+```html
+<iframe 
+  src="https://merchant-yapp.lovable.app" 
+  width="100%" 
+  height="600px" 
+  frameborder="0"
+  allow="clipboard-read; clipboard-write; web-share; payment"
+></iframe>
+```
+
+2. **Responsive embedding with dynamic height**:
+```html
+<div style="position: relative; padding-bottom: 120%; height: 0; overflow: hidden; max-width: 100%;">
+  <iframe
+    src="https://merchant-yapp.lovable.app"
+    frameborder="0"
+    style="position: absolute; top: 0; left: 0; width: 100%; height: 100%;"
+    allow="clipboard-read; clipboard-write; web-share; payment"
+  ></iframe>
+</div>
+```
+
+3. **Communication with parent window**:
+The application supports message passing with the parent window:
+
+```javascript
+// Listen for messages from the iframe
+window.addEventListener('message', (event) => {
+  // Make sure the message is from your app
+  if (event.origin !== 'https://merchant-yapp.lovable.app') return;
+  
+  // Handle specific message types
+  if (event.data.type === 'IFRAME_READY') {
+    console.log('Iframe is ready, height:', event.data.height);
+    // You can adjust iframe height dynamically
+  }
+  
+  if (event.data.type === 'OPEN_URL') {
+    // Handle URL opening requests from the iframe
+    window.open(event.data.url, event.data.target);
+  }
+});
+```
+
 ## ❓ Troubleshooting
 
 ### Common Issues
@@ -298,6 +347,30 @@ Contributions are welcome! Feel free to:
 1. Fork the repository
 2. Create a feature branch
 3. Submit a pull request
+
+## 🔄 Setting Up Yapp After Forking
+
+Important: Make sure your wallet already has an ENS. If not, head back to yodl.me, connect the wallet you're gonna use for your yapp and create a yodl handle for it.
+
+If you've forked this project and want to set up your own ENS identity, follow these steps in JustaName:
+1. Go to [JustaName](https://app.justaname.id/) and connect your wallet
+2. Set up your profile by adding:
+   - Profile picture (avatar)
+   - Header image
+   - Website URL (your deployed app URL)
+   
+3. Add the following custom ENS records by clicking the "+" button for each:
+
+| Key Field | Value Field |
+|-----------|-------------|
+| me.yodl.type | yapp |
+
+4. Important steps for adding records:
+   - Enter the key field and value field exactly as shown above
+   - Click + to add the record
+   - After adding, go back and click "Save"
+
+These custom records allow your app to work correctly with the Yodl and show up as a yapp. Next step would be to follow the ENS/subdomain from Yodl (or EFP).
 
 ## 📄 License
 

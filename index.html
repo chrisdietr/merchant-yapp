@@ -8,9 +8,24 @@
     <meta name="author" content="Lovable" />
     <meta property="og:url" content="https://merchant-yapp.lovable.app" />
     <meta property="og:site_name" content="merchant-yapp.yodl.eth" />
+    
+    <!-- Explicitly allow iframe embedding from any origin -->
+    <meta http-equiv="Content-Security-Policy" content="frame-ancestors *;" />
+    
+    <!-- Ensure proper mobile rendering in iframes -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    
+    <!-- Force HTTPS for security -->
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests;" />
+    
+    <!-- Allow wallet connection popups -->
+    <meta http-equiv="Content-Security-Policy" content="connect-src 'self' https: wss:;" />
+    
+    <!-- Allow external scripts needed for wallet connections -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.gpteng.co https://cdn.walletconnect.com https://verify.walletconnect.com https://*.walletconnect.org;" />
   </head>
 
-  <body>
+  <body style="overflow: auto; height: 100%; margin: 0;">
     <div id="root"></div>
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>

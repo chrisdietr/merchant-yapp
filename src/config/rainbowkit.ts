@@ -11,6 +11,18 @@ const chains = [mainnet, sepolia, optimism] as const
 // Get the actual website URL for metadata - ensure this runs only once
 const getAppUrl = () => {
   if (typeof window !== 'undefined') {
+    // When in an iframe, use the referrer URL as the parent origin
+    if (window.parent !== window) {
+      try {
+        const referrer = document.referrer;
+        if (referrer) {
+          const url = new URL(referrer);
+          return `${url.protocol}//${url.host}`;
+        }
+      } catch (e) {
+        console.error('Error parsing referrer:', e);
+      }
+    }
     return window.location.origin;
   }
   // Fallback for SSR
@@ -21,7 +33,13 @@ const getAppUrl = () => {
 const walletConnectOptions = {
   projectId, 
   showQrModal: true,
-  qrModalOptions: { themeMode: 'light' }
+  qrModalOptions: { 
+    themeMode: 'light',
+    // Ensure modals work in iframe contexts by opening in a new window if needed
+    explorerExcludedWalletIds: [],
+    // Use top-level window for mobile connection if in iframe
+    explorerRecommendedWalletIds: [],
+  }
 };
 
 // Create wallets configuration

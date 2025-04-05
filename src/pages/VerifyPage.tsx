@@ -4,7 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import yodlService from '../lib/yodl';
 import { formatCurrency } from '../utils/currency';
-import { getShopByOwnerAddress, generateTelegramLink } from '@/lib/utils';
+import { getShopByOwnerAddress, generateTelegramLink, openUrl } from '@/lib/utils';
 import shopsData from "@/config/shops.json";
 import html2canvas from 'html2canvas';
 import QRCode from 'qrcode.react';
@@ -308,12 +308,14 @@ const VerifyPage: React.FC = () => {
                   onClick={() => {
                     // First save confirmation to gallery
                     saveConfirmation().then(() => {
-                      // Then open Telegram with prepopulated message
-                      window.open(generateTelegramLink(shopInfo.telegramHandle, getTelegramMessage()), '_blank');
+                      // Then open Telegram with prepopulated message using our utility
+                      const telegramUrl = generateTelegramLink(shopInfo.telegramHandle, getTelegramMessage());
+                      openUrl(telegramUrl);
                     }).catch(error => {
                       console.error('Error saving image before opening Telegram:', error);
                       // Still open Telegram even if saving fails
-                      window.open(generateTelegramLink(shopInfo.telegramHandle, getTelegramMessage()), '_blank');
+                      const telegramUrl = generateTelegramLink(shopInfo.telegramHandle, getTelegramMessage());
+                      openUrl(telegramUrl);
                     });
                   }}
                   variant="link"

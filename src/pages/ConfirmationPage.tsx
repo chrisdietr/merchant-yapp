@@ -5,7 +5,7 @@ import yodlService from '../lib/yodl';
 import { FiatCurrency } from '@yodlpay/yapp-sdk';
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from '../utils/currency';
-import { getShopByOwnerAddress, generateTelegramLink } from '@/lib/utils';
+import { getShopByOwnerAddress, generateTelegramLink, openUrl } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 import shopsData from "@/config/shops.json";
 
@@ -628,12 +628,14 @@ const ConfirmationPage: React.FC = () => {
                     onClick={() => {
                       // First save confirmation to gallery
                       saveConfirmation().then(() => {
-                        // Then open Telegram with prepopulated message
-                        window.open(generateTelegramLink(telegramHandle, getTelegramMessage()), '_blank');
+                        // Then open Telegram with prepopulated message in appropriate context
+                        const telegramUrl = generateTelegramLink(telegramHandle, getTelegramMessage());
+                        openUrl(telegramUrl);
                       }).catch(error => {
                         console.error('Error saving image before opening Telegram:', error);
                         // Still open Telegram even if saving fails
-                        window.open(generateTelegramLink(telegramHandle, getTelegramMessage()), '_blank');
+                        const telegramUrl = generateTelegramLink(telegramHandle, getTelegramMessage());
+                        openUrl(telegramUrl);
                       });
                     }}
                     className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 w-full"

@@ -4,6 +4,7 @@ import { WagmiProvider } from 'wagmi'
 import { config } from '@/config/rainbowkit'
 import { RainbowKitProvider as RKProvider } from '@rainbow-me/rainbowkit'
 import { useMemo } from 'react'
+import { isInIframe } from '@/lib/utils'
 
 // Create a single query client instance that persists across renders
 // This helps avoid double initialization issues
@@ -23,6 +24,8 @@ const queryClient = new QueryClient({
 export function RainbowKitProvider({ children }: { children: React.ReactNode }) {
   // Use a stable config reference to prevent unnecessary re-renders
   const stableConfig = useMemo(() => config, []);
+  // Check if we're in an iframe
+  const inIframe = useMemo(() => isInIframe(), []);
   
   return (
     <WagmiProvider config={stableConfig}>
@@ -30,12 +33,12 @@ export function RainbowKitProvider({ children }: { children: React.ReactNode }) 
         <RKProvider 
           coolMode={false} 
           showRecentTransactions={false}
-          modalSize="compact"
+          modalSize={inIframe ? "compact" : "wide"}
           initialChain={10} // Set initial chain to Optimism (chainId 10)
         >
           {children}
         </RKProvider>
       </QueryClientProvider>
     </WagmiProvider>
-  )
+  );
 } 
