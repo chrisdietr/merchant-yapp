@@ -1,85 +1,91 @@
-import React, { useState } from 'react';
-import { Button } from './ui/button';
-import { useToast } from './ui/use-toast';
-import yodlService from '../lib/yodl';
+import React, { useEffect } from 'react';
 import { FiatCurrency } from '@yodlpay/yapp-sdk';
+import YodlService from '../lib/yodl';
+import { Button } from "@/components/ui/button";
+import { useNavigate } from 'react-router-dom';
 
 interface YodlBuyNowButtonProps {
-  productId: string;
-  productName: string;
-  price: number;
+  amount: number;
   currency: FiatCurrency;
-  isInCart?: boolean;
+  buttonText?: string;
+  buttonClassName?: string;
+  orderId?: string;
+  productName?: string;
   ownerAddress?: string;
 }
 
 const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
-  productId,
-  productName,
-  price,
+  amount,
   currency,
-  isInCart = false,
-  ownerAddress = '',
+  buttonText = 'Buy Now',
+  buttonClassName,
+  orderId,
+  productName,
+  ownerAddress,
 }) => {
-  const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = React.useState(false);
+  const navigate = useNavigate();
+  const isInIframe = YodlService.isInIframe();
 
-  // Check if we're in iframe mode
-  const isInIframe = yodlService.isInIframe();
-
-  const handlePayment = async (event: React.MouseEvent<HTMLButtonElement>) => {
-    // If we're in an iframe, prevent default behavior to avoid navigation issues
+  // Generate a unique order ID if not provided
+  const uniqueOrderId = orderId || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  
+  // Set up payment listener for iframe mode
+  useEffect(() => {
     if (isInIframe) {
-      event.preventDefault();
+      // This is now handled globally in the YodlService
+      console.log('Component in iframe mode, payment completion is handled by YodlService listener');
     }
-    
+  }, [isInIframe]);
+
+  // Handle payment via SDK
+  const handlePayment = async () => {
+    setLoading(true);
     try {
-      setIsLoading(true);
-      console.log(`Initiating payment with product name: ${productName}`);
-      console.log(`Payment currency: ${currency}`);
-      
-      // Log iframe status for debugging
-      console.log(`Operating in iframe mode: ${isInIframe}`);
-      
-      // Create a unique order ID
-      const orderId = `product_${productId}_${Date.now()}`;
-      
-      // Request payment through Yodl service with product metadata
-      await yodlService.requestPaymentWithSDK(price, currency, orderId, {
+      // Store product metadata before initiating payment
+      YodlService.storeOrderInfo(uniqueOrderId, {
+        amount,
+        currency,
         productName,
-        ownerAddress
+        ownerAddress,
+        timestamp: new Date().toISOString()
       });
       
-      // Yodl SDK will handle the payment flow or redirect
-      // We only reach here if the payment was initiated successfully
+      console.log('Initiating payment with product name:', productName, 'in iframe mode:', isInIframe);
       
-      // If we're in iframe, toast notification in current context rather than redirecting
-      if (isInIframe) {
-        toast({
-          title: "Payment Requested",
-          description: "Payment processing has started. Please check your wallet.",
-        });
+      // Use SDK to request payment with memo
+      const response = await YodlService.requestPaymentWithSDK(
+        amount,
+        currency,
+        uniqueOrderId,
+        { productName, ownerAddress } // Pass metadata directly
+      );
+
+      // In non-iframe mode, the SDK will handle redirects
+      // In iframe mode, we might receive a response directly
+      if (isInIframe && response && response.txHash) {
+        console.log('Payment completed in iframe with txHash:', response.txHash);
+        
+        // Optionally navigate to confirmation page
+        navigate(`/confirmation/${uniqueOrderId}?txHash=${response.txHash}&chainId=${response.chainId}`);
       }
-      
     } catch (error) {
       console.error('Payment failed:', error);
-      toast({
-        variant: "destructive",
-        title: "Payment Failed",
-        description: "There was an error processing your payment. Please try again.",
-      });
+      // Show error to user
+      alert(`Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
+  // Use the UI Button component from the app's library
   return (
-    <Button
-      className="w-full"
+    <Button 
       onClick={handlePayment}
-      disabled={isLoading}
+      className={buttonClassName}
+      disabled={loading}
     >
-      {isLoading ? 'Processing...' : isInCart ? 'Checkout' : 'Buy Now'}
+      {loading ? 'Processing...' : buttonText}
     </Button>
   );
 };

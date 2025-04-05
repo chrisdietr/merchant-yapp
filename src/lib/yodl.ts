@@ -8,12 +8,6 @@ interface ExtendedYappSDK extends YappSDK {
   getPendingPayments?: (address: string) => Promise<Payment[]>;
 }
 
-// Extend the Payment interface for our use case
-interface ExtendedPayment extends Payment {
-  memo?: string;
-  metadata?: any;
-}
-
 // Singleton instance of the YappSDK
 class YodlService {
   private static instance: YodlService;
@@ -34,6 +28,9 @@ class YodlService {
       }).catch(error => {
         console.error("Failed to get connected account from Yodl:", error);
       });
+
+      // Set up payment completion listener for iframe mode
+      this.setupPaymentCompletionListener();
     }
   }
 
@@ -47,35 +44,24 @@ class YodlService {
 
   // Check if running in iframe
   public isInIframe(): boolean {
-    try {
-      return isInIframe();
-    } catch (error) {
-      console.warn('Error checking iframe status:', error);
-      // If we can't determine for sure, assume not in iframe for safety
-      return false;
-    }
+    return isInIframe();
   }
   
   // Get the currently connected account from Yodl context
   public async getConnectedAccount(): Promise<string | null> {
+    if (!this.isInIframe()) {
+      return null;
+    }
+    
     try {
-      if (!this.isInIframe()) {
-        return null;
+      // Try to get the connected account from Yodl SDK
+      if (this.sdk.getAccount) {
+        const account = await this.sdk.getAccount();
+        return account;
       }
-      
-      try {
-        // Try to get the connected account from Yodl SDK
-        if (this.sdk.getAccount) {
-          const account = await this.sdk.getAccount();
-          return account;
-        }
-        return null;
-      } catch (error) {
-        console.error("Error getting connected account from Yodl:", error);
-        return null;
-      }
-    } catch (e) {
-      console.warn('Error in getConnectedAccount:', e);
+      return null;
+    } catch (error) {
+      console.error("Error getting connected account from Yodl:", error);
       return null;
     }
   }
@@ -170,201 +156,29 @@ class YodlService {
         ownerAddress: metadata?.ownerAddress // Store owner address if provided
       });
       
-      // Create webhook ID for tracking payment
-      const webhookId = `webhook_${Date.now()}`;
-      localStorage.setItem(`payment_pending_${memo}`, webhookId);
-      
-      // Store additional metadata in localStorage for retrieval
-      localStorage.setItem(`payment_metadata_${memo}`, JSON.stringify({
-        webhookId,
-        isIframe: this.isInIframe(),
-        orderInfo: memo
-      }));
-      
-      // If we are already inside an iframe, try to detect the connected account context
-      // and create a direct payment flow instead of opening another iframe
-      if (this.isInIframe()) {
-        console.log(`Handling iframe payment for ${memo}`);
-        
-        try {
-          // Check if we can get the account from the parent iframe context
-          const account = await this.getConnectedAccountCached();
-          
-          if (account) {
-            console.log(`Using connected account ${account} for direct payment`);
-            
-            // Start polling immediately for this payment
-            this._setupPaymentStatusPolling(memo, webhookId);
-            
-            // Try to notify the parent that we're requesting payment
-            this._safePostMessage(window.parent, {
-              type: 'PAYMENT_REQUESTED',
-              orderId: memo,
-              amount,
-              currency,
-              recipient: WALLET_ADDRESS
-            }, '*');
-            
-            // Use a placeholder payment response - actual payment will be detected by polling
-            return {
-              txHash: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
-              chainId: 1, // Ethereum mainnet as default
-              // Return a minimal object that satisfies the Payment interface
-            };
-          }
-        } catch (iframeError) {
-          console.warn('Failed to handle in-iframe payment directly:', iframeError);
-          // Fall back to regular payment flow below
-        }
-      }
-      
-      // Use origin for redirect to ensure we stay in the same context
-      const redirectUrl = `${window.location.origin}/confirmation/${memo}`;
-      
-      // Request payment using the SDK with only supported parameters
-      const response = await this.sdk.requestPayment(WALLET_ADDRESS, {
+      // Create payment config based on whether we're in an iframe or not
+      const paymentConfig: any = {
         amount,
         currency,
         memo,
-        redirectUrl, // Keep redirect for normal flow
-      });
+      };
 
-      // Set up a timer to poll for payment status for iframe scenarios
-      if (this.isInIframe()) {
-        console.log('Setting up payment status polling for iframe mode');
-        this._setupPaymentStatusPolling(memo, webhookId);
+      // Only add redirectUrl if NOT in iframe mode
+      if (!this.isInIframe()) {
+        console.log("Not in iframe, adding redirectUrl");
+        paymentConfig.redirectUrl = `${window.location.origin}/confirmation/${memo}`;
+      } else {
+        console.log("In iframe mode, not using redirectUrl");
       }
       
+      // Request payment using the SDK
+      const response = await this.sdk.requestPayment(WALLET_ADDRESS, paymentConfig);
+
       return response;
     } catch (error) {
       console.error('Payment failed:', error);
       throw error;
     }
-  }
-  
-  // Helper method to safely serialize data for postMessage
-  private _safePostMessage(targetWindow: Window, data: any, targetOrigin: string): void {
-    try {
-      // Deep clone and remove any URL objects or other non-serializable items
-      const safeData = this._makeDataPostMessageSafe(data);
-      targetWindow.postMessage(safeData, targetOrigin);
-    } catch (error) {
-      console.warn('Failed to post message safely:', error);
-    }
-  }
-
-  // Makes data safe for postMessage by removing URL objects and other non-serializable data
-  private _makeDataPostMessageSafe(data: any): any {
-    if (!data) return data;
-    
-    if (typeof data !== 'object') return data;
-    
-    // Handle arrays
-    if (Array.isArray(data)) {
-      return data.map(item => this._makeDataPostMessageSafe(item));
-    }
-    
-    // Handle objects
-    const result: any = {};
-    for (const key in data) {
-      if (Object.prototype.hasOwnProperty.call(data, key)) {
-        const value = data[key];
-        
-        // Skip URL objects
-        if (value instanceof URL) {
-          result[key] = value.toString(); // Convert URL to string
-        } else if (typeof value === 'object' && value !== null) {
-          result[key] = this._makeDataPostMessageSafe(value);
-        } else {
-          result[key] = value;
-        }
-      }
-    }
-    
-    return result;
-  }
-
-  // Poll for payment status as an alternative to redirects in iframe mode
-  private _setupPaymentStatusPolling(orderId: string, webhookId: string, attempts = 0): void {
-    // Maximum number of polling attempts (5 minutes at 5-second intervals)
-    const MAX_ATTEMPTS = 60;
-    const POLLING_INTERVAL = 5000; // 5 seconds
-    
-    if (attempts >= MAX_ATTEMPTS) {
-      console.log(`Giving up polling for payment ${orderId} after ${MAX_ATTEMPTS} attempts`);
-      return;
-    }
-    
-    setTimeout(async () => {
-      try {
-        // Check if payment has been completed via webhook
-        const webhookReceived = localStorage.getItem(`payment_completed_${webhookId}`);
-        
-        if (webhookReceived) {
-          console.log(`Payment for ${orderId} confirmed via webhook`);
-          // Clean up localStorage
-          localStorage.removeItem(`payment_pending_${orderId}`);
-          localStorage.removeItem(`payment_completed_${webhookId}`);
-          
-          // Refresh the page or update UI as needed
-          // But avoid redirect in iframe context
-          try {
-            if (this.isInIframe()) {
-              // Post message to parent to update UI
-              this._safePostMessage(window.parent, {
-                type: 'PAYMENT_COMPLETED',
-                orderId,
-                success: true
-              }, '*');
-            }
-          } catch (postError) {
-            console.warn('Error posting message to parent:', postError);
-          }
-          return;
-        }
-        
-        // If no webhook confirmation, check directly with API
-        // This is a fallback mechanism
-        try {
-          // Look for pending payments
-          const pendingPayments = await this.checkPendingPayments();
-          const matchingPayment = pendingPayments.find(p => {
-            // Cast to extended payment type
-            const extendedPayment = p as ExtendedPayment;
-            return extendedPayment.memo === orderId || 
-              (typeof extendedPayment.metadata === 'object' && 
-               extendedPayment.metadata?.orderInfo === orderId);
-          });
-          
-          if (matchingPayment) {
-            console.log(`Found matching payment for ${orderId}:`, matchingPayment);
-            // Handle successful payment
-            try {
-              if (this.isInIframe()) {
-                this._safePostMessage(window.parent, {
-                  type: 'PAYMENT_COMPLETED',
-                  orderId,
-                  success: true,
-                  payment: matchingPayment
-                }, '*');
-              }
-            } catch (postError) {
-              console.warn('Error posting message to parent:', postError);
-            }
-            return;
-          }
-        } catch (checkError) {
-          console.warn('Error checking pending payments:', checkError);
-        }
-        
-        // Continue polling
-        this._setupPaymentStatusPolling(orderId, webhookId, attempts + 1);
-      } catch (error) {
-        console.error('Error in payment polling:', error);
-        // Continue polling despite errors
-        this._setupPaymentStatusPolling(orderId, webhookId, attempts + 1);
-      }
-    }, POLLING_INTERVAL);
   }
 
   // Parse payment details from URL (used after redirect)
@@ -515,6 +329,82 @@ class YodlService {
     } catch (error) {
       console.error('Failed to fetch payment details:', error);
       throw error;
+    }
+  }
+
+  // Set up a listener for payment completion events in iframe mode
+  private setupPaymentCompletionListener(): void {
+    try {
+      window.addEventListener('message', async (event) => {
+        // Validate message origin for security (should match Yodl's domain)
+        // This is a basic check and should be enhanced in production
+        if (!event.origin.includes('yodl.me')) {
+          return;
+        }
+
+        const data = event.data;
+        
+        // Check if this is a payment completion message
+        if (data && data.type === 'yodlPaymentComplete') {
+          console.log('Received payment completion message:', data);
+          
+          // Extract payment details
+          const { txHash, chainId, memo } = data.payload || {};
+          
+          if (txHash && chainId) {
+            // Create a payment object
+            const payment: Payment = {
+              txHash: txHash as `0x${string}`,
+              chainId,
+            };
+            
+            // Look up the order info using the memo
+            const orderInfo = memo ? this.getOrderInfo(memo) : null;
+            
+            // If we have order info, navigate to confirmation page
+            if (orderInfo) {
+              console.log('Found order info for completed payment:', orderInfo);
+              
+              // Redirect to confirmation page with payment details
+              window.location.href = `${window.location.origin}/confirmation/${memo}?txHash=${txHash}&chainId=${chainId}`;
+            }
+          }
+        }
+      });
+      
+      console.log('Payment completion listener set up for iframe mode');
+    } catch (error) {
+      console.error('Failed to set up payment completion listener:', error);
+    }
+  }
+
+  // Check payment status for a specific order ID/memo in iframe mode
+  public async checkPaymentStatus(memo: string): Promise<Payment | null> {
+    try {
+      // Only relevant in iframe mode
+      if (!this.isInIframe()) {
+        console.log('Not in iframe mode, skipping payment status check');
+        return null;
+      }
+      
+      console.log(`Checking payment status for memo: ${memo}`);
+      
+      // Get pending payments for this address
+      const pendingPayments = await this.checkPendingPayments();
+      
+      // Try to find a payment with matching memo
+      // Note: This requires the Yodl SDK to expose this information
+      // If not available through SDK, you would need to use Yodl API
+      
+      console.log('Pending payments:', pendingPayments);
+      
+      // For now, we'll just log this information as the SDK might not expose memo matching
+      // In a real implementation, you might need to use Yodl APIs to check payment status
+      
+      return null;
+    } catch (error) {
+      console.error(`Failed to check payment status for memo ${memo}:`, error);
+      return null;
     }
   }
 }

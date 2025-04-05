@@ -82,11 +82,13 @@ export function ProductCard({ product }: ProductCardProps) {
           </ConnectButton.Custom>
         ) : product.inStock ? (
           <YodlBuyNowButton
-            productId={product.id}
-            productName={product.name}
-            price={product.price}
+            amount={product.price}
             currency={getCurrency(product.currency)}
+            orderId={orderId}
+            productName={product.name}
             ownerAddress={shopOwnerAddress}
+            buttonText="Buy Now"
+            buttonClassName="w-full gradient-button text-white h-9 md:h-10 px-3 md:px-4 py-2 inline-flex items-center justify-center rounded-md text-xs md:text-sm font-medium shadow-md shadow-purple-700/20 ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
         ) : (
           <Button 
