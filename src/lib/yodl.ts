@@ -158,7 +158,7 @@ class YodlService {
         amount,
         currency,
         memo,
-        redirectUrl: `${window.location.origin}/confirmation/${memo}`,
+        redirectUrl: window.location.href, // Stay in the current window
       });
 
       return response;
