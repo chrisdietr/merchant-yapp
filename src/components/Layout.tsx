@@ -59,15 +59,13 @@ export function Layout({ children }: LayoutProps) {
       {/* Always show header, even in iframe, but with adjusted styling */}
       <header className={`sticky ${isIframe ? 'top-10' : 'top-0'} z-50 border-b border-purple-200/50 dark:border-white/15 bg-white/90 dark:bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-background/60`}>
         <div className="container flex h-16 items-center justify-between relative">
-          {/* Title with mobile adjustments */}
-          <div className={`flex-1 ${isMobile ? 'flex justify-center' : ''}`}>
-            <Link 
-              to="/" 
-              className={`font-bold text-purple-800 dark:text-white hover:text-primary ${isMobile ? 'text-lg' : 'text-xl'}`}
-            >
-              Merchant Yapp
-            </Link>
-          </div>
+          {/* Keep the title left-aligned on all devices */}
+          <Link 
+            to="/" 
+            className="text-xl font-bold text-purple-800 dark:text-white hover:text-primary md:flex-none flex-shrink-0"
+          >
+            Merchant Yapp
+          </Link>
           
           {/* Mobile and Desktop navigation combined */}
           <div className="flex items-center gap-2 md:gap-4">
