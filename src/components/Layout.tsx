@@ -73,17 +73,9 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300" style={iframeStyles}>
       {/* Always show header, even in iframe, but with adjusted styling */}
       <header className={`sticky ${isIframe ? 'top-10' : 'top-0'} z-50 border-b border-purple-200/50 dark:border-white/15 bg-white/90 dark:bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-background/60`}>
-        <div className="container flex h-14 md:h-16 items-center justify-between relative">
-          {/* Keep the title left-aligned on all devices */}
-          <Link 
-            to="/" 
-            className="text-base md:text-xl font-bold text-purple-800 dark:text-white hover:text-primary md:flex-none flex-shrink-0"
-          >
-            Merchant Yapp
-          </Link>
-          
-          {/* Mobile and Desktop navigation combined */}
-          <div className="flex items-center gap-1 md:gap-4">
+        <div className="container flex h-14 md:h-16 items-center relative">
+          {/* Left section for admin scanner */}
+          <div className="flex-1 flex items-center">
             {/* Admin Scanner link - only show if admin AND authenticated */}
             {hasAdminAccess && (
               <Link 
@@ -107,14 +99,27 @@ export function Layout({ children }: LayoutProps) {
               </Link>
             )}
             
-            {/* Admin Indicator - only show a subtle indicator if admin (desktop only) */}
+            {/* Admin Indicator - show on desktop */}
             {hasAdminAccess && !isMobile && (
-              <div className="hidden md:flex items-center">
+              <div className="hidden md:flex items-center ml-4">
                 <span className="animate-pulse inline-block w-2 h-2 rounded-full bg-green-600 dark:bg-green-400 mr-2"></span>
                 <span className="text-sm font-medium text-green-600 dark:text-green-400">Admin</span>
               </div>
             )}
-            
+          </div>
+          
+          {/* Center the title */}
+          <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center justify-center my-auto">
+            <Link 
+              to="/" 
+              className="text-base md:text-xl font-bold text-purple-800 dark:text-white hover:text-primary"
+            >
+              Merchant Yapp
+            </Link>
+          </div>
+          
+          {/* Right section for controls */}
+          <div className="flex-1 flex items-center justify-end gap-1 md:gap-4">
             {/* Theme toggle before wallet connect */}
             <ThemeToggle />
             
