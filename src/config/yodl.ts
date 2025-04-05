@@ -27,7 +27,7 @@ export const getAdminWalletInfo = () => {
   
   // Legacy format (string only)
   return {
-    primaryIdentifier: adminInfo as string,
+    primaryIdentifier: adminInfo as unknown as string,
     fallbackAddress: null
   };
 };

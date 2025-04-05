@@ -5,6 +5,11 @@ import adminConfig from '../config/admin.json'
 import yodlService from '@/lib/yodl'
 import { FALLBACK_ADDRESS } from '@/config/yodl'
 
+// Define a type for the admin object structure
+type AdminConfig = {
+  admins: (string | { ens: string; address: string })[];
+};
+
 interface AuthContextType {
   isAuthenticated: boolean
   isAdmin: boolean
@@ -78,7 +83,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Get all admin addresses (both ENS and wallet addresses)
   const getAllAdminAddresses = (): string[] => {
-    return adminConfig.admins.flatMap(admin => {
+    return (adminConfig as AdminConfig).admins.flatMap(admin => {
       if (typeof admin === 'string') {
         // Handle legacy format (string only)
         return [normalizeAddress(admin)];
@@ -210,12 +215,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           version: '1'
         }).prepareMessage();
         
-        // Request signature via wagmi
-        const signature = await signMessageAsync({ message });
-        
-        if (signature) {
-          setIsAuthenticated(true);
-          return true;
+        // Request signature via wagmi - ensure we pass the account
+        try {
+          const signature = await signMessageAsync({ 
+            message,
+            account: address
+          });
+          
+          if (signature) {
+            setIsAuthenticated(true);
+            return true;
+          }
+        } catch (error) {
+          console.error('Error during signature:', error);
         }
       }
       
