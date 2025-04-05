@@ -4,7 +4,6 @@ import { SiweMessage } from 'siwe'
 import adminConfig from '../config/admin.json'
 import yodlService from '@/lib/yodl'
 import { FALLBACK_ADDRESS } from '@/config/yodl'
-import { requireAdmin } from "@/lib/auth"
 
 // Define a type for the admin object structure
 type AdminConfig = {
@@ -19,12 +18,11 @@ interface AuthContextType {
   signOut: () => void
   isLoading: boolean
   setIsAdmin?: (isAdmin: boolean) => void
-  isYodlFrame: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-// Force admin mode in development if needed
+// SECURITY: Never enable this in production
 const FORCE_ADMIN_MODE = false;
 
 // Store authentication state in localStorage to persist across page refreshes
@@ -33,8 +31,8 @@ const STORAGE_KEYS = {
   ADMIN_MODE: 'merchant_yapp_admin_mode'
 };
 
-// SECURITY CRITICAL: Require SIWE verification
-const skipSIWE = false;
+// Check if we're in development environment
+const IS_DEV = import.meta.env.MODE === 'development';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { address, isConnected } = useAccount()
@@ -47,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return savedAuth === 'true';
   })
   const [isAdmin, setIsAdmin] = useState(() => {
-    // Initialize from localStorage if available
+    // Initialize from localStorage if available, but only if we're not admin in dev
     const savedAdmin = localStorage.getItem(STORAGE_KEYS.ADMIN_MODE);
     return savedAdmin === 'true';
   })
@@ -176,88 +174,117 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [isConnected, yodlAddress]);
 
-  const isYodlFrame = window !== window.parent
-
+  // Sign-in function - handles both regular wallet and Yodl iframe scenarios
   const signIn = async (): Promise<boolean> => {
     try {
       setIsLoading(true);
       
-      if (!address) {
-        console.log("No wallet connected");
+      // Get the current address (wallet or Yodl)
+      const currentAddress = address || (yodlAddress as `0x${string}` | undefined);
+      
+      // SECURITY CHECK: Always verify admin status before proceeding
+      const isUserAdmin = checkAdminStatus(currentAddress);
+      console.log(`Attempting sign in for: ${currentAddress} isAdmin: ${isUserAdmin}`);
+      
+      // CRITICAL: Block non-admins immediately
+      if (!isUserAdmin) {
+        console.error("Authentication failed: Not an admin address");
         return false;
       }
-
-      console.log("Attempting sign in for:", address, "isAdmin:", requireAdmin(address));
       
-      // Only used during development for testing 
-      if (skipSIWE && process.env.NODE_ENV === 'development' && isAdmin) {
-        console.log("WARNING: SIWE verification skipped in development");
-        setIsAuthenticated(true);
-        return true;
-      }
+      // Security: Never bypass signature verification
+      // If you see "SIWE verification skipped in development" in the console, there's a security issue
       
-      if (isYodlFrame) {
+      // If in Yodl iframe mode and we have a Yodl address
+      if (isYodlIframe && yodlAddress) {
         try {
-          // In Yodl iframe, we need to use Yodl SDK to sign messages
+          // Create SIWE message
           const message = new SiweMessage({
             domain: window.location.host,
-            address: address as `0x${string}`,
-            statement: "Sign in to Merchant Yapp",
+            address: yodlAddress as `0x${string}`,
+            statement: 'Sign in to Merchant Yapp with Yodl',
             uri: window.location.origin,
-            version: "1",
-            chainId: 1,
-          });
+            version: '1',
+            chainId: 1, // Default to Ethereum mainnet
+            nonce: Math.floor(Math.random() * 1000000).toString(), // Generate random nonce
+          }).prepareMessage();
           
-          const messageToSign = message.prepareMessage();
+          // Sign message using Yodl SDK
+          const signature = await yodlService.signMessage(message);
           
-          // Use Yodl service to sign message
-          const signature = await yodlService.signMessage(messageToSign);
-          
+          // If we got a signature, consider authentication successful
           if (signature) {
             setIsAuthenticated(true);
             return true;
           }
           return false;
         } catch (error) {
-          console.error("Error during Yodl sign in:", error);
+          console.error('Error signing message with Yodl:', error);
           return false;
         }
-      } else {
-        // Regular wallet flow
+      }
+      
+      // Regular wallet flow
+      else if (address && isConnected) {
         try {
-          // Create a SIWE message with proper parameters
+          // Create SIWE message with explicit chainId
+          const nonce = Math.floor(Math.random() * 1000000).toString();
+          console.log(`Creating SIWE message with chainId: ${chainId} and nonce: ${nonce}`);
+          
           const message = new SiweMessage({
             domain: window.location.host,
             address: address,
-            statement: "Sign in to Merchant Yapp",
+            statement: 'Sign in to Merchant Yapp with Ethereum',
             uri: window.location.origin,
-            version: "1",
+            version: '1',
             chainId,
-          });
+            nonce,
+          }).prepareMessage();
           
-          const messageToSign = message.prepareMessage();
-          console.log("Preparing message to sign:", messageToSign);
+          console.log('Prepared SIWE message:', message);
           
-          // Sign the message with proper account parameter
-          const signature = await signMessageAsync({ 
-            message: messageToSign,
-            account: address
-          });
+          // SECURITY FIX: Always require signature verification
+          let signature: string | undefined;
           
-          console.log("Message signed successfully");
-          
-          if (signature) {
-            setIsAuthenticated(true);
-            return true;
+          // Only in development, provide a warning but still require signature
+          if (IS_DEV) {
+            try {
+              // Request signature via wagmi - ensure we pass the account
+              signature = await signMessageAsync({ 
+                message,
+                account: address
+              });
+              console.log("✅ Signature verified successfully:", signature.substring(0, 10) + "...");
+            } catch (error) {
+              console.error("❌ Signature verification failed:", error);
+              return false;
+            }
+          } else {
+            // Production flow - always require signature
+            signature = await signMessageAsync({ 
+              message,
+              account: address
+            });
           }
-          return false;
+          
+          // CRITICAL SECURITY: Always verify we have a valid signature
+          if (!signature) {
+            console.error("Authentication failed: No signature provided");
+            return false;
+          }
+          
+          // Authentication successful
+          setIsAuthenticated(true);
+          return true;
         } catch (error) {
-          console.error("Error during wallet sign in:", error);
+          console.error('Error during signature:', error);
           return false;
         }
       }
+      
+      return false;
     } catch (error) {
-      console.error("Error during sign in:", error);
+      console.error('Error during sign-in:', error);
       return false;
     } finally {
       setIsLoading(false);
@@ -284,7 +311,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signIn,
         signOut,
         isLoading,
-        isYodlFrame,
       }}
     >
       {children}

@@ -7,11 +7,10 @@ import yodlService from '@/lib/yodl';
 
 export function ConnectWalletButton() {
   const { isConnected } = useAccount();
-  const { isAuthenticated, signIn, signOut, isAdmin, isLoading: authLoading } = useAuth();
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [signInError, setSignInError] = useState<string | null>(null);
+  const { address, isAdmin, isAuthenticated, signIn } = useAuth();
   const [isYodlIframe, setIsYodlIframe] = useState(false);
   const [yodlAddress, setYodlAddress] = useState<string | null>(null);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   // Check if we're in an iframe on mount
@@ -49,30 +48,17 @@ export function ConnectWalletButton() {
     };
   }, [isAdmin, isAuthenticated, signIn]);
   
-  // Custom sign-in handler
+  // Handle sign in with proper loading state
   const handleSignIn = async () => {
     try {
-      // Reset error state
-      setSignInError(null);
-      
-      // Set loading state
-      setIsSigningIn(true);
-      
-      console.log("Attempting to sign in...");
-      
-      // Call the sign-in function from auth context
+      setIsConnecting(true);
+      console.log('Attempting to sign in...');
       const success = await signIn();
-      
-      console.log("Sign in result:", success);
-      
-      if (!success) {
-        setSignInError("Sign-in failed. Please try again.");
-      }
+      console.log('Sign in result:', success);
     } catch (error) {
-      console.error("Error during sign in:", error);
-      setSignInError("An error occurred during sign-in");
+      console.error('Error during sign in:', error);
     } finally {
-      setIsSigningIn(false);
+      setIsConnecting(false);
     }
   };
   
@@ -80,32 +66,26 @@ export function ConnectWalletButton() {
   if (isYodlIframe && yodlAddress) {
     return (
       <div className="flex items-center gap-1 md:gap-2">
-        {!isAuthenticated && isConnected && (
-          <Button
-            size="sm"
+        {isAdmin && !isAuthenticated && (
+          <Button 
+            variant="outline" 
+            size={isMobile ? "xs" : "sm"}
+            className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10 px-2 py-1 md:px-3 md:py-1.5"
             onClick={handleSignIn}
-            disabled={isSigningIn || authLoading}
-            className="text-xs bg-purple-600 hover:bg-purple-700 flex items-center"
+            disabled={isConnecting}
           >
-            {isSigningIn || authLoading ? "Signing in..." : "Sign In"}
+            {isConnecting ? 'Signing...' : 'Sign-In'}
           </Button>
         )}
         
-        {isAuthenticated && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={signOut}
-            className="text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-          >
-            Sign Out
-          </Button>
-        )}
-        
-        {/* Show error message if sign-in failed */}
-        {signInError && (
-          <div className="text-red-500 text-xs mt-1">{signInError}</div>
-        )}
+        <Button 
+          variant="outline" 
+          size={isMobile ? "xs" : "sm"}
+          className="text-xs md:text-sm border-purple-300/50 bg-purple-50/20 dark:border-white/20 dark:bg-white/5 cursor-default px-2 py-1 md:px-3 md:py-1.5"
+        >
+          <span className="mr-1 md:mr-2 h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-green-500"></span>
+          Connected via Yodl
+        </Button>
       </div>
     );
   }
@@ -119,24 +99,15 @@ export function ConnectWalletButton() {
         openAccountModal,
         openChainModal,
         openConnectModal,
-        authenticationStatus,
         mounted,
       }) => {
-        // Note: If your app doesn't use authentication, you
-        // can remove all 'authenticationStatus' checks
-        const ready = mounted && authenticationStatus !== 'loading';
-        const connected =
-          ready &&
-          account &&
-          chain &&
-          (!authenticationStatus ||
-            authenticationStatus === 'authenticated');
-
+        const ready = mounted;
+        
         return (
           <div
             {...(!ready && {
               'aria-hidden': true,
-              'style': {
+              style: {
                 opacity: 0,
                 pointerEvents: 'none',
                 userSelect: 'none',
@@ -144,63 +115,45 @@ export function ConnectWalletButton() {
             })}
           >
             {(() => {
-              if (!connected) {
+              if (!mounted || !account || !chain) {
                 return (
-                  <Button onClick={openConnectModal} size="sm" className="text-xs">
-                    Connect Wallet
-                  </Button>
-                );
-              }
-
-              if (chain.unsupported) {
-                return (
-                  <Button onClick={openChainModal} size="sm" variant="destructive" className="text-xs">
-                    Wrong network
-                  </Button>
-                );
-              }
-
-              return (
-                <div className="flex items-center gap-2">
-                  {!isAuthenticated && (
-                    <Button
-                      onClick={handleSignIn}
-                      size="sm"
-                      disabled={isSigningIn || authLoading}
-                      className="text-xs bg-purple-600 hover:bg-purple-700 flex items-center"
-                    >
-                      {isSigningIn || authLoading ? "Signing in..." : "Sign In"}
-                    </Button>
-                  )}
-                  
-                  {isAuthenticated && (
-                    <Button
-                      onClick={signOut}
-                      size="sm"
-                      variant="ghost"
-                      className="text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
-                    >
-                      Sign Out
-                    </Button>
-                  )}
-                  
-                  <Button
-                    onClick={openAccountModal}
-                    size="sm"
-                    variant="outline" 
-                    className="text-xs"
+                  <Button 
+                    onClick={openConnectModal} 
+                    variant="outline"
+                    size={isMobile ? "xs" : "sm"}
+                    className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10"
                   >
-                    {account.displayName}
-                    {account.displayBalance ? ` (${account.displayBalance})` : ''}
+                    Connect
                   </Button>
+                );
+              }
+              
+              return (
+                <div className="flex items-center gap-1 md:gap-2">
+                  {isAdmin && !isAuthenticated && (
+                    <Button 
+                      variant="outline" 
+                      size={isMobile ? "xs" : "sm"}
+                      className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10 px-2 py-1 md:px-3 md:py-1.5"
+                      onClick={handleSignIn}
+                      disabled={isConnecting}
+                    >
+                      {isConnecting ? 'Signing...' : 'Sign-In'}
+                    </Button>
+                  )}
+                  
+                  <button
+                    onClick={openAccountModal}
+                    className="flex h-7 md:h-9 items-center gap-1 rounded-md border border-purple-300/50 bg-white/80 px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm font-medium hover:bg-purple-50/50 dark:border-white/20 dark:bg-background/80 dark:hover:bg-white/10"
+                  >
+                    <span className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-green-500 mr-1 md:mr-2"></span>
+                    <span className="truncate max-w-[80px] md:max-w-[120px]">
+                      {account.displayName}
+                    </span>
+                  </button>
                 </div>
               );
             })()}
-            
-            {/* Show error message if sign-in failed */}
-            {signInError && (
-              <div className="text-red-500 text-xs mt-1">{signInError}</div>
-            )}
           </div>
         );
       }}
