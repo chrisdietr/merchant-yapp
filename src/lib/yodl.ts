@@ -155,23 +155,25 @@ class YodlService {
       
       // Special handling for iframe mode
       const isIframe = this.isInIframe();
-      const options = {
-        amount,
-        currency,
-        memo,
-        redirectUrl: window.location.href,
-      };
       
-      // If in iframe, avoid target="_blank" behavior by using parent window location
       if (isIframe) {
-        console.log('Operating in iframe mode, using special handling for redirects');
-        // Open in current iframe context by leveraging the SDK's iframe behavior
-        const response = await this.sdk.requestPayment(WALLET_ADDRESS, options);
-        return response;
+        console.log('Operating in iframe mode, using special iframe API handling');
+        
+        // In iframe mode, we need to avoid opening a new window
+        // Inside an iframe, don't set redirectUrl to prevent new windows
+        return await this.sdk.requestPayment(WALLET_ADDRESS, {
+          amount,
+          currency,
+          memo,
+        });
       } else {
         // Standard flow for non-iframe contexts
-        const response = await this.sdk.requestPayment(WALLET_ADDRESS, options);
-        return response;
+        return await this.sdk.requestPayment(WALLET_ADDRESS, {
+          amount,
+          currency,
+          memo,
+          redirectUrl: window.location.href, 
+        });
       }
     } catch (error) {
       console.error('Payment failed:', error);
