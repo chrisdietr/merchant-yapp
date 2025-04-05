@@ -8,6 +8,7 @@ interface YodlBuyNowButtonProps {
   productId: string;
   productName: string;
   price: number;
+  currency: FiatCurrency;
   isInCart?: boolean;
   ownerAddress?: string;
 }
@@ -16,6 +17,7 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
   productId,
   productName,
   price,
+  currency,
   isInCart = false,
   ownerAddress = '',
 }) => {
@@ -34,6 +36,7 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
     try {
       setIsLoading(true);
       console.log(`Initiating payment with product name: ${productName}`);
+      console.log(`Payment currency: ${currency}`);
       
       // Log iframe status for debugging
       console.log(`Operating in iframe mode: ${isInIframe}`);
@@ -42,7 +45,7 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
       const orderId = `product_${productId}_${Date.now()}`;
       
       // Request payment through Yodl service with product metadata
-      await yodlService.requestPaymentWithSDK(price, 'USD' as FiatCurrency, orderId, {
+      await yodlService.requestPaymentWithSDK(price, currency, orderId, {
         productName,
         ownerAddress
       });
