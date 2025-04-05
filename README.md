@@ -56,22 +56,29 @@ yarn dev
 
 ### Step 1: Configure Your Admin Wallet
 
-1. Open `src/config/admin.json` and replace the wallet address with your own:
+1. Open `src/config/admin.json` and configure your wallet:
 
 ```json
 {
   "admins": [
-    "YOUR_WALLET_ADDRESS_OR_ENS_HERE"
+    {
+      "ens": "YOUR_ENS_NAME.eth",
+      "address": "0xYOUR_WALLET_ADDRESS"
+    }
   ]
 }
 ```
 
-> ⚠️ **Important**: This wallet address or ENS name is used throughout the application for:
-> - Admin authentication
-> - Payment receiving address (Yodl)
-> - Shop owner identification
+> ⚠️ **Important**: This config supports both ENS names and wallet addresses:
+> - `ens`: Your ENS name which is used as the primary identifier in Yodl payment links
+> - `address`: Your wallet address as fallback for authentication
 >
-> When using Ethereum addresses, they must be lowercase. ENS names are supported (e.g., "vitalik.eth").
+> The system will:
+> - Always use ENS for payments if available
+> - Fall back to the wallet address for admin verification if ENS resolution fails
+> - Support authentication via either the ENS name or wallet address
+>
+> When using Ethereum addresses, they must be lowercase.
 
 ### Step 2: Configure Your Shop
 

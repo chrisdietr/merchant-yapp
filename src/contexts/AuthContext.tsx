@@ -3,6 +3,7 @@ import { useAccount, useSignMessage, useDisconnect } from 'wagmi'
 import { SiweMessage } from 'siwe'
 import adminConfig from '../config/admin.json'
 import yodlService from '@/lib/yodl'
+import { FALLBACK_ADDRESS } from '@/config/yodl'
 
 interface AuthContextType {
   isAuthenticated: boolean
@@ -75,12 +76,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return addr.toLowerCase().trim();
   };
 
+  // Get all admin addresses (both ENS and wallet addresses)
+  const getAllAdminAddresses = (): string[] => {
+    return adminConfig.admins.flatMap(admin => {
+      if (typeof admin === 'string') {
+        // Handle legacy format (string only)
+        return [normalizeAddress(admin)];
+      } else if (typeof admin === 'object') {
+        // Handle new format (object with ens and address)
+        const addresses: string[] = [];
+        if (admin.ens) addresses.push(normalizeAddress(admin.ens));
+        if (admin.address) addresses.push(normalizeAddress(admin.address));
+        return addresses;
+      }
+      return [];
+    });
+  };
+
   // Check if the current address is in the admin list
   const checkAdminStatus = (currentAddress: string | undefined): boolean => {
     if (!currentAddress) return false;
     
-    // Get admin addresses from config
-    const adminAddresses = adminConfig.admins.map(normalizeAddress);
+    // Get all admin addresses (ENS and wallet addresses)
+    const adminAddresses = getAllAdminAddresses();
     
     // Normalize the current address
     const normalizedCurrentAddress = normalizeAddress(currentAddress);

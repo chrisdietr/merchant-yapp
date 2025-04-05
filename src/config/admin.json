@@ -1,5 +1,8 @@
 {
   "admins": [
-    "tam.yodl.eth"
+    {
+      "ens": "tam.yodl.eth",
+      "address": "0xd5f20ddcbcfe9f1a963f07f8d1dcf8cec884c943"
+    }
   ]
 } 

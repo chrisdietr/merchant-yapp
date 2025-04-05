@@ -13,8 +13,30 @@ export const SUPPORTED_CURRENCIES = [
   FiatCurrency.THB
 ];
 
-// Get the admin wallet address or ENS from the config (could be an ETH address or ENS name)
-export const WALLET_ADDRESS = adminConfig.admins[0];
+// Get the admin wallet ENS (preferred) or address from the config
+export const getAdminWalletInfo = () => {
+  const adminInfo = adminConfig.admins[0];
+  
+  // If the new format with ens and address is used
+  if (typeof adminInfo === 'object' && adminInfo.ens) {
+    return {
+      primaryIdentifier: adminInfo.ens,
+      fallbackAddress: adminInfo.address || null
+    };
+  }
+  
+  // Legacy format (string only)
+  return {
+    primaryIdentifier: adminInfo as string,
+    fallbackAddress: null
+  };
+};
+
+// Get the primary identifier (ENS if available, otherwise address)
+export const WALLET_ADDRESS = getAdminWalletInfo().primaryIdentifier;
+
+// Get the fallback address if needed
+export const FALLBACK_ADDRESS = getAdminWalletInfo().fallbackAddress;
 
 // Order metadata interface for better type checking
 export interface OrderMetadata {
@@ -38,15 +60,16 @@ export const generateYodlLink = (
   disconnectWallet: boolean = false,
   metadata?: OrderMetadata
 ): string => {
-  // Ensure the wallet address is properly formatted
-  // If ENS name, use as is. If ETH address, remove 0x prefix if present
-  const walletAddressOrENS = WALLET_ADDRESS;
-  const formattedWalletAddress = walletAddressOrENS.startsWith('0x')
-    ? walletAddressOrENS.substring(2)
-    : walletAddressOrENS;
+  // Always use ENS name if available, otherwise use address
+  const walletIdentifier = WALLET_ADDRESS;
+  
+  // If it's an ETH address, remove 0x prefix as required by Yodl
+  const formattedIdentifier = walletIdentifier.startsWith('0x')
+    ? walletIdentifier.substring(2)
+    : walletIdentifier;
   
   // Create base URL with required parameters (without protocol)
-  const baseUrl = `yodl.me/${formattedWalletAddress}?amount=${amount}&currency=${currency}`;
+  const baseUrl = `yodl.me/${formattedIdentifier}?amount=${amount}&currency=${currency}`;
   
   // Get the current origin with protocol
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
