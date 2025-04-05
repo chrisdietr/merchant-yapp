@@ -14,7 +14,7 @@ const getAppUrl = () => {
     return window.location.origin;
   }
   // Fallback for SSR
-  return 'https://merchant-yapp.vercel.app';
+  return 'https://merchant-yapp.lovable.app';
 };
 
 // Set walletConnectOptions with custom projectId to prevent default initialization
@@ -26,7 +26,7 @@ const walletConnectOptions = {
 
 // Create wallets configuration
 const { connectors } = getDefaultWallets({
-  appName: 'Merchant Yapp',
+  appName: 'Merchant Yapp | merchant-yapp.yodl.eth',
   projectId,
   // Use the correct URL for metadata
   appUrl: getAppUrl(),
