@@ -61,12 +61,17 @@ yarn dev
 ```json
 {
   "admins": [
-    "YOUR_WALLET_ADDRESS_HERE"
+    "YOUR_WALLET_ADDRESS_OR_ENS_HERE"
   ]
 }
 ```
 
-> ⚠️ **Important**: Wallet addresses in `admin.json` must be lowercase. This ensures authentication works properly.
+> ⚠️ **Important**: This wallet address or ENS name is used throughout the application for:
+> - Admin authentication
+> - Payment receiving address (Yodl)
+> - Shop owner identification
+>
+> When using Ethereum addresses, they must be lowercase. ENS names are supported (e.g., "vitalik.eth").
 
 ### Step 2: Configure Your Shop
 
@@ -76,7 +81,6 @@ yarn dev
 {
   "shops": [
     {
-      "ownerAddress": "YOUR_WALLET_ADDRESS_HERE",
       "name": "Your Shop Name",
       "telegramHandle": "your_telegram_handle"
     }
@@ -87,7 +91,7 @@ yarn dev
 }
 ```
 
-> ℹ️ **Note**: The `ownerAddress` in your shop configuration is automatically used for all products. You don't need to specify an owner for each product.
+> ℹ️ **Note**: The shop will automatically use the wallet address or ENS from `admin.json` as the payment receiving address.
 > ℹ️ **Note**: The `telegramHandle` is optional. If left empty, the "Contact Seller on Telegram" button will not be displayed.
 
 ### Step 3: Add Products

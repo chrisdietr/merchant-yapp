@@ -13,15 +13,19 @@ export function cn(...inputs: ClassValue[]) {
  * @returns Shop information or null if not found
  */
 export function getShopByOwnerAddress(ownerAddress: string): Shop | null {
-  // Normalize address for case-insensitive comparison
-  const normalizedAddress = ownerAddress.toLowerCase();
+  // Just return the first shop from shops data since we're
+  // now using the admin wallet address as the owner
+  const shop = shopsData.shops[0];
   
-  // Find shop with matching owner address
-  const shop = shopsData.shops.find(
-    shop => shop.ownerAddress.toLowerCase() === normalizedAddress
-  );
+  if (!shop) {
+    return null;
+  }
   
-  return shop || null;
+  return {
+    ...shop,
+    // Ensure the ownerAddress is set to the passed address for compatibility
+    ownerAddress: ownerAddress
+  };
 }
 
 /**

@@ -13,14 +13,21 @@ export const SUPPORTED_CURRENCIES = [
   FiatCurrency.THB
 ];
 
-// Get the admin wallet address from the config
+// Get the admin wallet address or ENS from the config (could be an ETH address or ENS name)
 export const WALLET_ADDRESS = adminConfig.admins[0];
 
-// Define interface for order metadata
-interface OrderMetadata {
+// Order metadata interface for better type checking
+export interface OrderMetadata {
   productName?: string;
+  productId?: string;
   ownerAddress?: string;
-  [key: string]: any; // Allow any additional metadata
+  timestamp?: string;
+  amount?: number;
+  currency?: FiatCurrency | string;
+  status?: string;
+  nonce?: string;
+  senderAddress?: string;
+  emoji?: string;
 }
 
 // Function to generate a Yodl payment link with redirect to confirmation page
@@ -31,10 +38,12 @@ export const generateYodlLink = (
   disconnectWallet: boolean = false,
   metadata?: OrderMetadata
 ): string => {
-  // Ensure the wallet address is properly formatted (remove 0x prefix if present)
-  const formattedWalletAddress = WALLET_ADDRESS.startsWith('0x') 
-    ? WALLET_ADDRESS.substring(2) 
-    : WALLET_ADDRESS;
+  // Ensure the wallet address is properly formatted
+  // If ENS name, use as is. If ETH address, remove 0x prefix if present
+  const walletAddressOrENS = WALLET_ADDRESS;
+  const formattedWalletAddress = walletAddressOrENS.startsWith('0x')
+    ? walletAddressOrENS.substring(2)
+    : walletAddressOrENS;
   
   // Create base URL with required parameters (without protocol)
   const baseUrl = `yodl.me/${formattedWalletAddress}?amount=${amount}&currency=${currency}`;
