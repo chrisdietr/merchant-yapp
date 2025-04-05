@@ -1,78 +1,82 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { Button } from './ui/button';
+import { useToast } from './ui/use-toast';
+import yodlService from '../lib/yodl';
 import { FiatCurrency } from '@yodlpay/yapp-sdk';
-import YodlService from '../lib/yodl';
-import { Button } from "@/components/ui/button";
 
 interface YodlBuyNowButtonProps {
-  amount: number;
-  currency: FiatCurrency;
-  buttonText?: string;
-  buttonClassName?: string;
-  orderId?: string;
-  productName?: string;
+  productId: string;
+  productName: string;
+  price: number;
+  isInCart?: boolean;
   ownerAddress?: string;
 }
 
 const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
-  amount,
-  currency,
-  buttonText = 'Buy Now',
-  buttonClassName,
-  orderId,
+  productId,
   productName,
-  ownerAddress,
+  price,
+  isInCart = false,
+  ownerAddress = '',
 }) => {
-  const [loading, setLoading] = React.useState(false);
-  const isInIframe = YodlService.isInIframe();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Generate a unique order ID if not provided
-  const uniqueOrderId = orderId || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
-  
-  // Handle payment via SDK
-  const handlePayment = async (e: React.MouseEvent<HTMLButtonElement>) => {
-    // Prevent default behavior to avoid any unwanted navigation
-    e.preventDefault();
+  // Check if we're in iframe mode
+  const isInIframe = yodlService.isInIframe();
+
+  const handlePayment = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    // If we're in an iframe, prevent default behavior to avoid navigation issues
+    if (isInIframe) {
+      event.preventDefault();
+    }
     
-    setLoading(true);
     try {
-      // Store product metadata before initiating payment
-      YodlService.storeOrderInfo(uniqueOrderId, {
-        amount,
-        currency,
+      setIsLoading(true);
+      console.log(`Initiating payment with product name: ${productName}`);
+      
+      // Log iframe status for debugging
+      console.log(`Operating in iframe mode: ${isInIframe}`);
+      
+      // Create a unique order ID
+      const orderId = `product_${productId}_${Date.now()}`;
+      
+      // Request payment through Yodl service with product metadata
+      await yodlService.requestPaymentWithSDK(price, 'USD' as FiatCurrency, orderId, {
         productName,
-        ownerAddress,
-        timestamp: new Date().toISOString()
+        ownerAddress
       });
       
-      console.log('Initiating payment with product name:', productName);
-      console.log('Operating in iframe mode:', isInIframe);
+      // Yodl SDK will handle the payment flow or redirect
+      // We only reach here if the payment was initiated successfully
       
-      // Use SDK to request payment with memo
-      await YodlService.requestPaymentWithSDK(
-        amount,
-        currency,
-        uniqueOrderId,
-        { productName, ownerAddress } // Pass metadata directly
-      );
-      // Note: We don't need to handle the response here as the SDK 
-      // will redirect to the specified redirectUrl after payment
+      // If we're in iframe, toast notification in current context rather than redirecting
+      if (isInIframe) {
+        toast({
+          title: "Payment Requested",
+          description: "Payment processing has started. Please check your wallet.",
+        });
+      }
+      
     } catch (error) {
       console.error('Payment failed:', error);
-      // Show error to user
-      alert(`Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      toast({
+        variant: "destructive",
+        title: "Payment Failed",
+        description: "There was an error processing your payment. Please try again.",
+      });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
-  // Use the UI Button component from the app's library
   return (
-    <Button 
+    <Button
+      className="w-full"
       onClick={handlePayment}
-      className={buttonClassName}
-      disabled={loading}
+      disabled={isLoading}
     >
-      {loading ? 'Processing...' : buttonText}
+      {isLoading ? 'Processing...' : isInCart ? 'Checkout' : 'Buy Now'}
     </Button>
   );
 };

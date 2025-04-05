@@ -170,8 +170,7 @@ class YodlService {
         ownerAddress: metadata?.ownerAddress // Store owner address if provided
       });
       
-      // We'll keep the redirectUrl for normal navigation post-payment
-      // But we'll also set up for webhook handling
+      // Create webhook ID for tracking payment
       const webhookId = `webhook_${Date.now()}`;
       localStorage.setItem(`payment_pending_${memo}`, webhookId);
       
@@ -181,6 +180,43 @@ class YodlService {
         isIframe: this.isInIframe(),
         orderInfo: memo
       }));
+      
+      // If we are already inside an iframe, try to detect the connected account context
+      // and create a direct payment flow instead of opening another iframe
+      if (this.isInIframe()) {
+        console.log(`Handling iframe payment for ${memo}`);
+        
+        try {
+          // Check if we can get the account from the parent iframe context
+          const account = await this.getConnectedAccountCached();
+          
+          if (account) {
+            console.log(`Using connected account ${account} for direct payment`);
+            
+            // Start polling immediately for this payment
+            this._setupPaymentStatusPolling(memo, webhookId);
+            
+            // Try to notify the parent that we're requesting payment
+            this._safePostMessage(window.parent, {
+              type: 'PAYMENT_REQUESTED',
+              orderId: memo,
+              amount,
+              currency,
+              recipient: WALLET_ADDRESS
+            }, '*');
+            
+            // Use a placeholder payment response - actual payment will be detected by polling
+            return {
+              txHash: '0x0000000000000000000000000000000000000000000000000000000000000000' as `0x${string}`,
+              chainId: 1, // Ethereum mainnet as default
+              // Return a minimal object that satisfies the Payment interface
+            };
+          }
+        } catch (iframeError) {
+          console.warn('Failed to handle in-iframe payment directly:', iframeError);
+          // Fall back to regular payment flow below
+        }
+      }
       
       // Use origin for redirect to ensure we stay in the same context
       const redirectUrl = `${window.location.origin}/confirmation/${memo}`;
