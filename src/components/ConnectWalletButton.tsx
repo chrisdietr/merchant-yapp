@@ -11,6 +11,7 @@ export function ConnectWalletButton() {
   const [isYodlIframe, setIsYodlIframe] = useState(false);
   const [yodlAddress, setYodlAddress] = useState<string | null>(null);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Check if we're in an iframe on mount
   useEffect(() => {
@@ -33,17 +34,29 @@ export function ConnectWalletButton() {
         }
       });
     }
+    
+    // Check for mobile
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkIsMobile);
+    };
   }, [isAdmin, isAuthenticated, signIn]);
   
   // When in Yodl iframe and we have a detected address, show custom button
   if (isYodlIframe && yodlAddress) {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1 md:gap-2">
         {isAdmin && !isAuthenticated && (
           <Button 
             variant="outline" 
-            size="sm"
-            className="border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10"
+            size={isMobile ? "xs" : "sm"}
+            className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10 px-2 py-1 md:px-3 md:py-1.5"
             onClick={() => {
               setIsConnecting(true);
               signIn().finally(() => setIsConnecting(false));
@@ -56,10 +69,10 @@ export function ConnectWalletButton() {
         
         <Button 
           variant="outline" 
-          size="sm"
-          className="border-purple-300/50 bg-purple-50/20 dark:border-white/20 dark:bg-white/5 cursor-default"
+          size={isMobile ? "xs" : "sm"}
+          className="text-xs md:text-sm border-purple-300/50 bg-purple-50/20 dark:border-white/20 dark:bg-white/5 cursor-default px-2 py-1 md:px-3 md:py-1.5"
         >
-          <span className="mr-2 h-2 w-2 rounded-full bg-green-500"></span>
+          <span className="mr-1 md:mr-2 h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-green-500"></span>
           Connected via Yodl
         </Button>
       </div>

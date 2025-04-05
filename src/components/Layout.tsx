@@ -58,26 +58,26 @@ export function Layout({ children }: LayoutProps) {
     <div className="min-h-screen bg-background text-foreground transition-colors duration-300" style={iframeStyles}>
       {/* Always show header, even in iframe, but with adjusted styling */}
       <header className={`sticky ${isIframe ? 'top-10' : 'top-0'} z-50 border-b border-purple-200/50 dark:border-white/15 bg-white/90 dark:bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-background/60`}>
-        <div className="container flex h-16 items-center justify-between relative">
+        <div className="container flex h-14 md:h-16 items-center justify-between relative">
           {/* Keep the title left-aligned on all devices */}
           <Link 
             to="/" 
-            className="text-xl font-bold text-purple-800 dark:text-white hover:text-primary md:flex-none flex-shrink-0"
+            className="text-base md:text-xl font-bold text-purple-800 dark:text-white hover:text-primary md:flex-none flex-shrink-0"
           >
             Merchant Yapp
           </Link>
           
           {/* Mobile and Desktop navigation combined */}
-          <div className="flex items-center gap-2 md:gap-4">
+          <div className="flex items-center gap-1 md:gap-4">
             {/* Admin Scanner link - only show if admin AND authenticated */}
             {hasAdminAccess && (
               <Link 
                 to="/admin/scanner"
-                className="flex items-center gap-1 text-sm font-medium text-green-600 hover:text-green-500 dark:text-green-400 dark:hover:text-green-300"
+                className="flex items-center gap-1 text-xs md:text-sm font-medium text-green-600 hover:text-green-500 dark:text-green-400 dark:hover:text-green-300"
                 aria-label="Admin Scanner"
               >
                 {/* QR Code icon */}
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="md:w-4 md:h-4">
                   <rect x="3" y="3" width="5" height="5" rx="1" />
                   <rect x="16" y="3" width="5" height="5" rx="1" />
                   <rect x="3" y="16" width="5" height="5" rx="1" />
@@ -104,8 +104,8 @@ export function Layout({ children }: LayoutProps) {
             {isConnected && isAdmin && !isAuthenticated && !isIframe && (
               <Button 
                 variant="outline" 
-                size="sm"
-                className="border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10"
+                size={isMobile ? "xs" : "sm"}
+                className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10 px-2 py-1 md:px-3 md:py-1.5"
                 onClick={() => signIn()}
                 disabled={isLoading}
               >
@@ -122,7 +122,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </header>
       
-      <main className={isIframe ? "pt-16 py-2 px-2" : "container py-6 px-4 md:py-8 md:px-6"}>
+      <main className={isIframe ? "pt-14 py-2 px-2" : "container py-6 px-4 md:py-8 md:px-6"}>
         {children || <Outlet />}
       </main>
     </div>
