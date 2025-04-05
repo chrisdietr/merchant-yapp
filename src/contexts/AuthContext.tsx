@@ -238,33 +238,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             uri: window.location.origin,
             version: '1',
             chainId,
+            // Use nonce as a field, not within the message
             nonce,
-          }).prepareMessage();
+          });
           
-          console.log('Prepared SIWE message:', message);
+          // Prepare the message after setting all parameters
+          const preparedMessage = message.prepareMessage();
+          console.log('Prepared SIWE message:', preparedMessage);
           
           // SECURITY FIX: Always require signature verification
           let signature: string | undefined;
           
           // Only in development, provide a warning but still require signature
           if (IS_DEV) {
+            console.warn('⚠️ Development mode: Still requiring signature verification for security');
             try {
-              // Request signature via wagmi - ensure we pass the account
-              signature = await signMessageAsync({ 
-                message,
+              // Sign the message using the connected wallet
+              signature = await signMessageAsync({
+                message: preparedMessage,
                 account: address
               });
-              console.log("✅ Signature verified successfully:", signature.substring(0, 10) + "...");
             } catch (error) {
-              console.error("❌ Signature verification failed:", error);
+              console.error('Error during signature:', error);
               return false;
             }
           } else {
-            // Production flow - always require signature
-            signature = await signMessageAsync({ 
-              message,
-              account: address
-            });
+            try {
+              // Sign the message using the connected wallet
+              signature = await signMessageAsync({
+                message: preparedMessage,
+                account: address
+              });
+            } catch (error) {
+              console.error('Error during signature:', error);
+              return false;
+            }
           }
           
           // CRITICAL SECURITY: Always verify we have a valid signature

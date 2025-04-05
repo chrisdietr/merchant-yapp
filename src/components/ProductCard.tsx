@@ -47,7 +47,7 @@ export function ProductCard({ product }: ProductCardProps) {
   };
 
   return (
-    <Card className="w-full h-full flex flex-col gradient-card text-card-foreground border border-white/10 hover:shadow-xl hover:shadow-purple-500/30">
+    <Card className="w-full max-w-[95%] mx-auto md:max-w-none h-full flex flex-col gradient-card text-card-foreground border border-white/10 hover:shadow-xl hover:shadow-purple-500/30">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 md:gap-3 text-xl md:text-2xl">
           <span className="text-3xl md:text-4xl bg-white/15 p-2 rounded-full flex-shrink-0">{product.emoji}</span>

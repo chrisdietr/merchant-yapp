@@ -74,11 +74,11 @@ export function Layout({ children }: LayoutProps) {
       {/* Always show header, even in iframe, but with adjusted styling */}
       <header className={`sticky ${isIframe ? 'top-10' : 'top-0'} z-50 border-b border-purple-200/50 dark:border-white/15 bg-white/90 dark:bg-background/80 backdrop-blur-lg supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-background/60`}>
         <div className="container flex h-14 md:h-16 items-center justify-between relative px-4 sm:px-6">
-          {/* Title container with proper padding and centering */}
-          <div className="flex items-center justify-center h-full pl-0 sm:pl-2">
+          {/* Title container with proper height and vertical alignment */}
+          <div className="flex items-center h-14 md:h-16">
             <Link 
               to="/" 
-              className="text-base md:text-xl font-bold text-purple-800 dark:text-white hover:text-primary"
+              className="text-base md:text-xl font-bold text-purple-800 dark:text-white hover:text-primary leading-none inline-flex items-center h-full"
             >
               Merchant Yapp
             </Link>
@@ -126,7 +126,7 @@ export function Layout({ children }: LayoutProps) {
         </div>
       </header>
       
-      <main className={isIframe ? "pt-14 py-2 px-2" : "container py-6 px-4 md:py-8 md:px-6"}>
+      <main className={isIframe ? "pt-14 py-2 px-2" : "container py-2 px-4 md:py-6 md:px-6"}>
         {children || <Outlet />}
       </main>
     </div>
