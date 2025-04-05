@@ -7,10 +7,11 @@ import yodlService from '@/lib/yodl';
 
 export function ConnectWalletButton() {
   const { isConnected } = useAccount();
-  const { address, isAdmin, isAuthenticated, signIn } = useAuth();
+  const { isAuthenticated, signIn, signOut, isAdmin, isLoading: authLoading } = useAuth();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [signInError, setSignInError] = useState<string | null>(null);
   const [isYodlIframe, setIsYodlIframe] = useState(false);
   const [yodlAddress, setYodlAddress] = useState<string | null>(null);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
   // Check if we're in an iframe on mount
@@ -48,17 +49,30 @@ export function ConnectWalletButton() {
     };
   }, [isAdmin, isAuthenticated, signIn]);
   
-  // Handle sign in with proper loading state
+  // Custom sign-in handler
   const handleSignIn = async () => {
     try {
-      setIsConnecting(true);
-      console.log('Attempting to sign in...');
+      // Reset error state
+      setSignInError(null);
+      
+      // Set loading state
+      setIsSigningIn(true);
+      
+      console.log("Attempting to sign in...");
+      
+      // Call the sign-in function from auth context
       const success = await signIn();
-      console.log('Sign in result:', success);
+      
+      console.log("Sign in result:", success);
+      
+      if (!success) {
+        setSignInError("Sign-in failed. Please try again.");
+      }
     } catch (error) {
-      console.error('Error during sign in:', error);
+      console.error("Error during sign in:", error);
+      setSignInError("An error occurred during sign-in");
     } finally {
-      setIsConnecting(false);
+      setIsSigningIn(false);
     }
   };
   
@@ -66,26 +80,32 @@ export function ConnectWalletButton() {
   if (isYodlIframe && yodlAddress) {
     return (
       <div className="flex items-center gap-1 md:gap-2">
-        {isAdmin && !isAuthenticated && (
-          <Button 
-            variant="outline" 
-            size={isMobile ? "xs" : "sm"}
-            className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10 px-2 py-1 md:px-3 md:py-1.5"
+        {!isAuthenticated && isConnected && (
+          <Button
+            size="sm"
             onClick={handleSignIn}
-            disabled={isConnecting}
+            disabled={isSigningIn || authLoading}
+            className="text-xs bg-purple-600 hover:bg-purple-700 flex items-center"
           >
-            {isConnecting ? 'Signing...' : 'Sign-In'}
+            {isSigningIn || authLoading ? "Signing in..." : "Sign In"}
           </Button>
         )}
         
-        <Button 
-          variant="outline" 
-          size={isMobile ? "xs" : "sm"}
-          className="text-xs md:text-sm border-purple-300/50 bg-purple-50/20 dark:border-white/20 dark:bg-white/5 cursor-default px-2 py-1 md:px-3 md:py-1.5"
-        >
-          <span className="mr-1 md:mr-2 h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-green-500"></span>
-          Connected via Yodl
-        </Button>
+        {isAuthenticated && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={signOut}
+            className="text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+          >
+            Sign Out
+          </Button>
+        )}
+        
+        {/* Show error message if sign-in failed */}
+        {signInError && (
+          <div className="text-red-500 text-xs mt-1">{signInError}</div>
+        )}
       </div>
     );
   }
@@ -99,15 +119,24 @@ export function ConnectWalletButton() {
         openAccountModal,
         openChainModal,
         openConnectModal,
+        authenticationStatus,
         mounted,
       }) => {
-        const ready = mounted;
-        
+        // Note: If your app doesn't use authentication, you
+        // can remove all 'authenticationStatus' checks
+        const ready = mounted && authenticationStatus !== 'loading';
+        const connected =
+          ready &&
+          account &&
+          chain &&
+          (!authenticationStatus ||
+            authenticationStatus === 'authenticated');
+
         return (
           <div
             {...(!ready && {
               'aria-hidden': true,
-              style: {
+              'style': {
                 opacity: 0,
                 pointerEvents: 'none',
                 userSelect: 'none',
@@ -115,45 +144,63 @@ export function ConnectWalletButton() {
             })}
           >
             {(() => {
-              if (!mounted || !account || !chain) {
+              if (!connected) {
                 return (
-                  <Button 
-                    onClick={openConnectModal} 
-                    variant="outline"
-                    size={isMobile ? "xs" : "sm"}
-                    className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10"
-                  >
-                    Connect
+                  <Button onClick={openConnectModal} size="sm" className="text-xs">
+                    Connect Wallet
                   </Button>
                 );
               }
-              
+
+              if (chain.unsupported) {
+                return (
+                  <Button onClick={openChainModal} size="sm" variant="destructive" className="text-xs">
+                    Wrong network
+                  </Button>
+                );
+              }
+
               return (
-                <div className="flex items-center gap-1 md:gap-2">
-                  {isAdmin && !isAuthenticated && (
-                    <Button 
-                      variant="outline" 
-                      size={isMobile ? "xs" : "sm"}
-                      className="text-xs md:text-sm border-purple-300/50 hover:bg-purple-50/50 dark:border-white/20 dark:hover:bg-white/10 px-2 py-1 md:px-3 md:py-1.5"
+                <div className="flex items-center gap-2">
+                  {!isAuthenticated && (
+                    <Button
                       onClick={handleSignIn}
-                      disabled={isConnecting}
+                      size="sm"
+                      disabled={isSigningIn || authLoading}
+                      className="text-xs bg-purple-600 hover:bg-purple-700 flex items-center"
                     >
-                      {isConnecting ? 'Signing...' : 'Sign-In'}
+                      {isSigningIn || authLoading ? "Signing in..." : "Sign In"}
                     </Button>
                   )}
                   
-                  <button
+                  {isAuthenticated && (
+                    <Button
+                      onClick={signOut}
+                      size="sm"
+                      variant="ghost"
+                      className="text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20"
+                    >
+                      Sign Out
+                    </Button>
+                  )}
+                  
+                  <Button
                     onClick={openAccountModal}
-                    className="flex h-7 md:h-9 items-center gap-1 rounded-md border border-purple-300/50 bg-white/80 px-2 py-1 md:px-3 md:py-1.5 text-xs md:text-sm font-medium hover:bg-purple-50/50 dark:border-white/20 dark:bg-background/80 dark:hover:bg-white/10"
+                    size="sm"
+                    variant="outline" 
+                    className="text-xs"
                   >
-                    <span className="h-1.5 w-1.5 md:h-2 md:w-2 rounded-full bg-green-500 mr-1 md:mr-2"></span>
-                    <span className="truncate max-w-[80px] md:max-w-[120px]">
-                      {account.displayName}
-                    </span>
-                  </button>
+                    {account.displayName}
+                    {account.displayBalance ? ` (${account.displayBalance})` : ''}
+                  </Button>
                 </div>
               );
             })()}
+            
+            {/* Show error message if sign-in failed */}
+            {signInError && (
+              <div className="text-red-500 text-xs mt-1">{signInError}</div>
+            )}
           </div>
         );
       }}

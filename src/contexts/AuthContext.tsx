@@ -15,7 +15,7 @@ interface AuthContextType {
   isAuthenticated: boolean
   isAdmin: boolean
   address: `0x${string}` | undefined
-  signIn: () => Promise<void>
+  signIn: () => Promise<boolean>
   signOut: () => void
   isLoading: boolean
   setIsAdmin?: (isAdmin: boolean) => void
@@ -33,8 +33,8 @@ const STORAGE_KEYS = {
   ADMIN_MODE: 'merchant_yapp_admin_mode'
 };
 
-// Skip SIWE verification during development - can toggle this when deploying
-const skipSIWE = true
+// SECURITY CRITICAL: Require SIWE verification
+const skipSIWE = false;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { address, isConnected } = useAccount()
@@ -178,49 +178,91 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isYodlFrame = window !== window.parent
 
-  const signIn = async () => {
+  const signIn = async (): Promise<boolean> => {
     try {
+      setIsLoading(true);
+      
       if (!address) {
-        console.log("No wallet connected")
-        return
+        console.log("No wallet connected");
+        return false;
       }
 
-      console.log("Attempting sign in for:", address, "isAdmin:", requireAdmin(address))
+      console.log("Attempting sign in for:", address, "isAdmin:", requireAdmin(address));
       
-      if (skipSIWE) {
-        // Skip SIWE verification in development mode
-        console.log("SIWE verification skipped in development")
-        setIsAuthenticated(true)
-        return
+      // Only used during development for testing 
+      if (skipSIWE && process.env.NODE_ENV === 'development' && isAdmin) {
+        console.log("WARNING: SIWE verification skipped in development");
+        setIsAuthenticated(true);
+        return true;
       }
       
       if (isYodlFrame) {
-        // In Yodl iframe, we just set authenticated without SIWE
-        setIsAuthenticated(true)
+        try {
+          // In Yodl iframe, we need to use Yodl SDK to sign messages
+          const message = new SiweMessage({
+            domain: window.location.host,
+            address: address as `0x${string}`,
+            statement: "Sign in to Merchant Yapp",
+            uri: window.location.origin,
+            version: "1",
+            chainId: 1,
+          });
+          
+          const messageToSign = message.prepareMessage();
+          
+          // Use Yodl service to sign message
+          const signature = await yodlService.signMessage(messageToSign);
+          
+          if (signature) {
+            setIsAuthenticated(true);
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error("Error during Yodl sign in:", error);
+          return false;
+        }
       } else {
-        // Create a simplified SIWE message
-        const message = new SiweMessage({
-          domain: window.location.host,
-          address,
-          statement: "Sign in to Merchant Yapp",
-          uri: window.location.origin,
-          version: "1",
-          chainId: 1, // Ethereum mainnet
-        })
-        
-        const messageToSign = message.prepareMessage()
-        
-        // Sign the message
-        const signature = await signMessageAsync({ message: messageToSign })
-        
-        // If we get here without error, authentication succeeded
-        setIsAuthenticated(true)
+        // Regular wallet flow
+        try {
+          // Create a SIWE message with proper parameters
+          const message = new SiweMessage({
+            domain: window.location.host,
+            address: address,
+            statement: "Sign in to Merchant Yapp",
+            uri: window.location.origin,
+            version: "1",
+            chainId,
+          });
+          
+          const messageToSign = message.prepareMessage();
+          console.log("Preparing message to sign:", messageToSign);
+          
+          // Sign the message with proper account parameter
+          const signature = await signMessageAsync({ 
+            message: messageToSign,
+            account: address
+          });
+          
+          console.log("Message signed successfully");
+          
+          if (signature) {
+            setIsAuthenticated(true);
+            return true;
+          }
+          return false;
+        } catch (error) {
+          console.error("Error during wallet sign in:", error);
+          return false;
+        }
       }
     } catch (error) {
-      console.error("Error during sign in:", error)
-      setIsAuthenticated(false)
+      console.error("Error during sign in:", error);
+      return false;
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
 
   // Sign-out function
   const signOut = () => {
