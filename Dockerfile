@@ -30,7 +30,9 @@ COPY package-lock.json ./
 
 # Install production dependencies only with legacy peer deps
 RUN npm install --legacy-peer-deps --production && \
-    npm cache clean --force
+    npm install session-file-store && \
+    npm cache clean --force && \
+    mkdir -p sessions
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist ./dist

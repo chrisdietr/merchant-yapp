@@ -5,6 +5,7 @@ import path from 'path';
 import fs from 'fs';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
+import FileStore from 'session-file-store';
 import helmet from 'helmet';
 import { fileURLToPath } from 'url';
 import util from 'util';
@@ -28,6 +29,8 @@ const __dirname = path.dirname(__filename);
 const PORT = process.env.PORT || 3000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:8089';
 
+const FileStoreSession = FileStore(session);
+
 const app = express();
 
 // Security
@@ -44,8 +47,14 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: true }));
 
-// Session configuration
+// Session configuration with file store
 app.use(session({
+  store: new FileStoreSession({
+    path: './sessions',
+    ttl: 86400, // 1 day
+    reapInterval: 3600, // 1 hour
+    retries: 0
+  }),
   secret: process.env.SESSION_SECRET || 'supersecretkey',
   name: 'connect.sid',
   resave: false,
@@ -82,10 +91,18 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
-// Routes
+// API Routes
 app.use('/api/products', productsRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/siwe', siweRouter);
+
+// Serve static files from the React app
+app.use(express.static(path.join(__dirname, '../dist')));
+
+// Handle React routing, return all requests to React app
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../dist/index.html'));
+});
 
 // Start server
 app.listen(PORT, () => {
