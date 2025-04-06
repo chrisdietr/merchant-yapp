@@ -455,3 +455,14 @@ These custom records allow your app to work correctly with the Yodl and show up 
 ## 📄 License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
+
+# Build the image
+docker build -t merchant-yapp .
+
+# Run the container
+docker run -d \
+  --name merchant-yapp \
+  -p 3000:3000 \
+  --memory="1g" \
+  --cpus="2" \
+  merchant-yapp
