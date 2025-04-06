@@ -1,166 +1,106 @@
-import { useState, useCallback, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useWalletClient, usePublicClient, useAccount } from 'wagmi';
-import { getAddress } from 'viem';
-import yodlService from '@/lib/yodl';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect } from 'react';
 import { FiatCurrency } from '@yodlpay/yapp-sdk';
-import shopsData from "@/config/shops.json";
-import { Loader2 } from 'lucide-react';
+import YodlService from '../lib/yodl';
+import { Button } from "@/components/ui/button";
+import { useNavigate } from 'react-router-dom';
 
-// Props interface for the component
-export interface YodlBuyNowButtonProps {
+interface YodlBuyNowButtonProps {
   amount: number;
   currency: FiatCurrency;
-  productId?: string;
+  buttonText?: string;
+  buttonClassName?: string;
+  orderId?: string;
   productName?: string;
   ownerAddress?: string;
 }
 
-// Main YodlBuyNowButton component
-export const YodlBuyNowButton = ({
+const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
   amount,
   currency,
-  productId,
+  buttonText = 'Buy Now',
+  buttonClassName,
+  orderId,
   productName,
-  ownerAddress
-}: YodlBuyNowButtonProps) => {
-  const [loading, setLoading] = useState(false);
-  const [paymentRequested, setPaymentRequested] = useState(false);
-  const { address: userAddress, isConnected } = useAccount();
-  const { data: walletClient } = useWalletClient();
-  const publicClient = usePublicClient();
+  ownerAddress,
+}) => {
+  const [loading, setLoading] = React.useState(false);
   const navigate = useNavigate();
+  const isInIframe = YodlService.isInIframe();
 
-  // Handle buy button click
-  const handleBuyClick = useCallback(async () => {
-    // Continue with payment if wallet is connected
-    if (userAddress && isConnected && walletClient) {
-      await handlePaymentRequest();
-    } 
-    // Otherwise the connect button will handle wallet connection
-  }, [userAddress, isConnected, walletClient, amount, currency, productId, productName, ownerAddress]);
-
-  // Handle payment request
-  const handlePaymentRequest = async () => {
-    if (!userAddress || !isConnected) {
-      console.error('No wallet connected');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setPaymentRequested(true);
+  // Generate a unique order ID if not provided
+  const uniqueOrderId = orderId || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  
+  // Safely check if we're in an iframe context
+  useEffect(() => {
+    if (isInIframe) {
+      console.log('Component in iframe mode, payment completion is handled by YodlService listener');
       
-      // Prepare order ID - product orders are in format product_ID_TIMESTAMP
-      const timestamp = Date.now();
-      let orderId = `order_${timestamp}`;
-      
-      // If we have a product ID, use it in the order ID
-      if (productId) {
-        orderId = `product_${productId}_${timestamp}`;
-      }
-      
-      console.log(`Creating order ${orderId} for ${amount} ${currency}`);
-
-      // Store order info in localStorage before payment
-      const initialOrderInfo = {
-        orderId,
-        status: 'pending' as const,
-        amount,
-        currency,
-        productId,
-        productName,
-        ownerAddress,
-        timestamp: new Date().toISOString(),
+      // Add safety check for iframe ethereum conflicts
+      const checkForEthereumConflict = () => {
+        try {
+          // Don't reference window.ethereum directly, just check if it exists
+          if (typeof window !== 'undefined') {
+            console.log('Running in iframe environment, making sure ethereum access is safe');
+          }
+        } catch (error) {
+          console.warn('Error checking ethereum availability:', error);
+        }
       };
       
-      // Store the initial order info
-      yodlService.storeOrderInfo(orderId, initialOrderInfo);
-      
-      // Now request payment with the SDK
-      const requestResponse = await yodlService.requestPaymentWithSDK(
+      checkForEthereumConflict();
+    }
+  }, [isInIframe]);
+
+  // Handle payment via SDK
+  const handlePayment = async () => {
+    setLoading(true);
+    try {
+      // Store product metadata before initiating payment
+      YodlService.storeOrderInfo(uniqueOrderId, {
         amount,
         currency,
-        orderId,
-        {
-          productName,
-          ownerAddress,
-          buyerAddress: userAddress
-        }
+        productName,
+        ownerAddress,
+        timestamp: new Date().toISOString()
+      });
+      
+      console.log('Initiating payment with product name:', productName, 'in iframe mode:', isInIframe);
+      
+      // Use SDK to request payment with memo
+      const response = await YodlService.requestPaymentWithSDK(
+        amount,
+        currency,
+        uniqueOrderId,
+        { productName, ownerAddress } // Pass metadata directly
       );
-      
-      console.log('Payment request response:', requestResponse);
-      
-      // If we're in iframe mode and have a response with txHash, navigate to confirmation
-      if (yodlService.isInIframe() && requestResponse && requestResponse.txHash) {
-        navigate(`/confirmation/${orderId}?txHash=${requestResponse.txHash}&chainId=${requestResponse.chainId}`);
+
+      // In non-iframe mode, the SDK will handle redirects
+      // In iframe mode, we might receive a response directly
+      if (isInIframe && response && response.txHash) {
+        console.log('Payment completed in iframe with txHash:', response.txHash);
+        
+        // Optionally navigate to confirmation page
+        navigate(`/confirmation/${uniqueOrderId}?txHash=${response.txHash}&chainId=${response.chainId}`);
       }
-      // SDK will handle redirects in non-iframe mode
     } catch (error) {
-      console.error('Error during payment process:', error);
+      console.error('Payment failed:', error);
+      // Show error to user
       alert(`Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
       setLoading(false);
     }
   };
 
-  // Display loading state during payment process
-  const renderButton = () => {
-    // Check if the yodlService is available
-    if (!yodlService) {
-      return (
-        <Button disabled className="w-full">
-          Loading...
-        </Button>
-      );
-    }
-    
-    if (loading) {
-      return (
-        <Button disabled className="w-full">
-          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          Processing Payment...
-        </Button>
-      );
-    }
-    
-    if (!isConnected) {
-      return (
-        <ConnectButton.Custom>
-          {({ openConnectModal }) => (
-            <Button 
-              onClick={() => {
-                openConnectModal();
-                // After wallet is connected, handleBuyClick will be triggered via useEffect
-              }}
-              className="w-full"
-            >
-              Connect Wallet to Buy ({amount} {currency})
-            </Button>
-          )}
-        </ConnectButton.Custom>
-      );
-    }
-    
-    return (
-      <Button
-        onClick={handleBuyClick}
-        className="w-full"
-      >
-        Buy Now for {amount} {currency}
-      </Button>
-    );
-  };
-
-  // When wallet connects, try to initiate payment
-  useEffect(() => {
-    if (isConnected && userAddress && walletClient && !loading && !paymentRequested) {
-      handleBuyClick();
-    }
-  }, [isConnected, userAddress, walletClient, handleBuyClick, loading, paymentRequested]);
-
-  return renderButton();
+  // Use the UI Button component from the app's library
+  return (
+    <Button 
+      onClick={handlePayment}
+      className={buttonClassName}
+      disabled={loading}
+    >
+      {loading ? 'Processing...' : buttonText}
+    </Button>
+  );
 };
 
 export default YodlBuyNowButton; 

@@ -8,9 +8,6 @@ import { formatCurrency } from '../utils/currency';
 import { getShopByOwnerAddress, generateTelegramLink, openUrl } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 import shopsData from "@/config/shops.json";
-import { OrderInfo } from '@/lib/yodl';
-import { Shop } from '@/lib/types';
-import { useAccount, useSignMessage } from 'wagmi';
 
 // Order details interface
 interface OrderDetails {
@@ -22,9 +19,6 @@ interface OrderDetails {
   timestamp?: string;
   productName?: string;
   ownerAddress?: string;
-  signature?: string;
-  messageToSign?: string;
-  buyerAddress?: string;
 }
 
 // Direct lookup for product names - will use product ID from orderId
@@ -50,10 +44,6 @@ const ConfirmationPage: React.FC = () => {
   const previewCardRef = useRef<HTMLDivElement>(null);
   const [isCapturing, setIsCapturing] = useState<boolean>(false);
   const [isMobile, setIsMobile] = useState<boolean>(false);
-  const [isSigning, setIsSigning] = useState<boolean>(false);
-  const [signatureComplete, setSignatureComplete] = useState<boolean>(false);
-  const { address } = useAccount();
-  const { signMessageAsync } = useSignMessage();
   
   // Check if device is mobile
   useEffect(() => {
@@ -68,71 +58,6 @@ const ConfirmationPage: React.FC = () => {
       window.removeEventListener('resize', checkIsMobile);
     };
   }, []);
-
-  // Handle message signing for order verification
-  const handleSignMessage = async (orderDetails: OrderDetails) => {
-    try {
-      if (!address) {
-        console.error('No wallet address available for message signing');
-        return false;
-      }
-
-      setIsSigning(true);
-      
-      // Create message to sign
-      const messageToSign = yodlService.createOrderSignMessage(
-        orderDetails.orderId,
-        orderDetails.amount,
-        orderDetails.currency
-      );
-      
-      console.log('Requesting wallet to sign message:', messageToSign);
-      
-      // Use wagmi to sign the message
-      const signature = await signMessageAsync({
-        message: messageToSign,
-        account: address
-      });
-      
-      console.log('Message signed successfully:', signature);
-      
-      // Update the order with signature info
-      const updatedOrder = {
-        ...orderDetails,
-        signature,
-        messageToSign,
-        buyerAddress: address
-      };
-      
-      // Update state and localStorage
-      setOrder(updatedOrder);
-      
-      // Prepare data for storage in OrderInfo format
-      const orderInfoData: OrderInfo = {
-        orderId: orderDetails.orderId,
-        timestamp: orderDetails.timestamp || new Date().toISOString(),
-        status: orderDetails.status,
-        amount: orderDetails.amount,
-        currency: orderDetails.currency,
-        signature,
-        messageToSign,
-        buyerAddress: address,
-        txHash: orderDetails.txHash,
-        productName: orderDetails.productName,
-        ownerAddress: orderDetails.ownerAddress
-      };
-      
-      yodlService.storeOrderInfo(orderDetails.orderId, orderInfoData);
-      
-      setSignatureComplete(true);
-      return true;
-    } catch (error) {
-      console.error('Error signing message:', error);
-      return false;
-    } finally {
-      setIsSigning(false);
-    }
-  };
 
   useEffect(() => {
     // If we don't have an orderId, we can't proceed
@@ -251,11 +176,6 @@ const ConfirmationPage: React.FC = () => {
         const shop = getShopByOwnerAddress(storedOrderInfo.ownerAddress);
         setShopInfo(shop);
       }
-      
-      // Set signature complete flag if we already have a signature
-      if (storedOrderInfo.signature && storedOrderInfo.messageToSign) {
-        setSignatureComplete(true);
-      }
     }
 
     // If we have a payment from URL, update order and fetch details
@@ -268,14 +188,12 @@ const ConfirmationPage: React.FC = () => {
 
       // Store the transaction hash in the order info
       if (storedOrderInfo) {
-        const updatedOrderInfo: OrderInfo = {
+        yodlService.storeOrderInfo(orderId, {
           ...storedOrderInfo,
-          orderId,
           txHash: payment.txHash,
-          status: 'completed',
+          status: 'completed', // Ensure status stays as completed
           timestamp: storedOrderInfo.timestamp || new Date().toISOString(),
-        };
-        yodlService.storeOrderInfo(orderId, updatedOrderInfo);
+        });
       }
 
       // Fetch payment details from Yodl
@@ -291,28 +209,6 @@ const ConfirmationPage: React.FC = () => {
     }
   }, [orderId]);
 
-  // Process verified payment and initiate signature if needed
-  useEffect(() => {
-    const processVerifiedPayment = async () => {
-      // Only proceed if not already signing, not already signed, payment confirmed, and we have order details
-      if (!isSigning && !signatureComplete && order.status === 'completed' && !loading && address) {
-        console.log('Order confirmed, requesting message signature...');
-        
-        // Check if we already have a signature
-        if (order.signature && order.messageToSign) {
-          console.log('Order already has signature, skipping signature request');
-          setSignatureComplete(true);
-          return;
-        }
-        
-        // Request signature
-        await handleSignMessage(order);
-      }
-    };
-    
-    processVerifiedPayment();
-  }, [loading, order.status, signatureComplete, isSigning, address]);
-
   // Fetch payment details from Yodl API
   const fetchPaymentDetails = async (txHash: string) => {
     try {
@@ -326,8 +222,6 @@ const ConfirmationPage: React.FC = () => {
         // Extract relevant details from the API response
         // The new API may have different field names
         const mappedDetails = {
-          // Need to include the orderId
-          orderId: orderId as string,
           // Keep existing txHash
           txHash,
           // Map API response fields to our OrderDetails interface
@@ -351,7 +245,9 @@ const ConfirmationPage: React.FC = () => {
         }));
         
         // Update order info in localStorage
-        yodlService.storeOrderInfo(orderId as string, mappedDetails as OrderInfo);
+        yodlService.storeOrderInfo(orderId as string, {
+          ...mappedDetails,
+        });
         
         // Try to get shop info if ownerAddress is available
         if (mappedDetails.ownerAddress) {
@@ -436,16 +332,8 @@ const ConfirmationPage: React.FC = () => {
       });
   };
 
-  // Get the order QR code value - includes transaction hash and signature data if available
+  // Get the order QR code value - includes transaction hash if available
   const getOrderQRValue = () => {
-    // First check if we have signature data to include
-    if (order.signature && order.messageToSign && order.buyerAddress) {
-      console.log('Using signature data for QR code');
-      // Include signature verification data in the QR code
-      return yodlService.getOrderQRData(order.orderId);
-    }
-    
-    // Fallback to URL-based verification
     const baseUrl = window.location.origin;
     if (order.txHash) {
       return `${baseUrl}/verify/${order.orderId}/${order.txHash}`;
@@ -554,7 +442,7 @@ const ConfirmationPage: React.FC = () => {
       if (product) {
         // Find shop with matching owner address
         for (const shop of shopsData.shops) {
-          if (shop.telegramHandle) {
+          if (shop.ownerAddress && shop.telegramHandle) {
             console.log('Found shop with telegramHandle:', shop.name, shop.telegramHandle);
             return shop.telegramHandle;
           }
@@ -573,22 +461,6 @@ const ConfirmationPage: React.FC = () => {
     return null;
   };
 
-  // Content to show while waiting for signature
-  const renderSigningView = () => {
-    return (
-      <div className="text-center py-6 md:py-10 bg-white dark:bg-card border rounded-lg shadow-sm p-4 md:p-6 mb-4 md:mb-6">
-        <div className="spinner mb-3 md:mb-4"></div>
-        <h2 className="text-lg md:text-xl font-semibold mb-2">Verifying Purchase</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-          Please sign the message in your wallet to complete the verification process.
-        </p>
-        <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-700 dark:bg-amber-900/30 dark:border-amber-800 dark:text-amber-300 text-sm">
-          <p>Your signature confirms that you purchased this item and will be used for verification.</p>
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="max-w-lg mx-auto px-4 py-4 md:py-8">
       <h1 className="text-xl md:text-2xl font-bold mb-4 md:mb-6">Order Confirmation</h1>
@@ -605,9 +477,6 @@ const ConfirmationPage: React.FC = () => {
             Return to home
           </Link>
         </div>
-      ) : isSigning ? (
-        // Show signing view while waiting for signature
-        renderSigningView()
       ) : (
         <>
           <div ref={confirmationRef} className="bg-white dark:bg-card border rounded-lg shadow-sm p-4 md:p-6 mb-4 md:mb-6">
@@ -698,23 +567,6 @@ const ConfirmationPage: React.FC = () => {
                 </div>
               )}
             </div>
-            
-            {/* Verification badge */}
-            {order.signature && order.messageToSign && order.buyerAddress && (
-              <div className="border border-green-100 dark:border-green-800 bg-green-50 dark:bg-green-900/30 rounded-md p-3 text-sm text-green-800 dark:text-green-200">
-                <div className="flex items-start gap-2">
-                  <svg className="w-5 h-5 mt-0.5 flex-shrink-0 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                  </svg>
-                  <div>
-                    <p className="font-medium">Verified Purchase</p>
-                    <p className="text-xs text-green-700 dark:text-green-300 mt-0.5">
-                      This order has been cryptographically signed by the buyer
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
           
           {/* Preview card for saving to gallery - sleeker version */}

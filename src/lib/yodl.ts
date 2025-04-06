@@ -1,27 +1,11 @@
 import YappSDK, { FiatCurrency, Payment, isInIframe } from '@yodlpay/yapp-sdk';
 import { WALLET_ADDRESS } from '../config/yodl';
-import { verifyMessage } from 'viem';
 
 // Add SDK method extensions for TypeScript
 interface ExtendedYappSDK extends YappSDK {
   getAccount?: () => Promise<string | null>;
   signMessage?: (message: string) => Promise<string>;
   getPendingPayments?: (address: string) => Promise<Payment[]>;
-}
-
-// Extended order info with signature data
-export interface OrderInfo {
-  amount: number;
-  currency: string;
-  timestamp: string;
-  orderId: string;
-  productName?: string;
-  ownerAddress?: string;
-  buyerAddress?: string;
-  signature?: string;
-  messageToSign?: string;
-  txHash?: string;
-  status?: 'pending' | 'completed' | 'failed';
 }
 
 // Singleton instance of the YappSDK
@@ -139,7 +123,7 @@ class YodlService {
   }
 
   // Store information about an order in localStorage
-  public storeOrderInfo(orderId: string, info: OrderInfo): void {
+  public storeOrderInfo(orderId: string, info: any): void {
     try {
       const storageKey = `order_info_${orderId}`;
       localStorage.setItem(storageKey, JSON.stringify(info));
@@ -150,7 +134,7 @@ class YodlService {
   }
 
   // Get stored order information from localStorage
-  public getOrderInfo(orderId: string): OrderInfo | null {
+  public getOrderInfo(orderId: string): any {
     try {
       const storageKey = `order_info_${orderId}`;
       const data = localStorage.getItem(storageKey);
@@ -163,79 +147,12 @@ class YodlService {
     return null;
   }
 
-  // Create a message to sign for order verification
-  public createOrderSignMessage(orderId: string, amount: number, currency: string): string {
-    const timestamp = new Date().toISOString();
-    return `Verify order ${orderId} for ${amount} ${currency} at ${timestamp}`;
-  }
-
-  // Sign an order message
-  public async signOrderMessage(
-    orderId: string, 
-    amount: number, 
-    currency: string,
-    buyerAddress: string
-  ): Promise<{signature: string, messageToSign: string} | null> {
-    try {
-      // Create the message to sign
-      const messageToSign = this.createOrderSignMessage(orderId, amount, currency);
-      console.log('Message to sign:', messageToSign);
-      
-      // Sign the message
-      let signature: string;
-      
-      // If in iframe, use SDK signMessage
-      if (this.isInIframe() && this.sdk.signMessage) {
-        signature = await this.sdk.signMessage(messageToSign);
-      } else {
-        // For regular wallets, need to use wagmi or other wallet provider
-        // This would be handled by the component using this service
-        throw new Error("Not in iframe mode, please use wagmi signMessage instead");
-      }
-      
-      console.log('Signature:', signature, 'Buyer address:', buyerAddress);
-      
-      return { signature, messageToSign };
-    } catch (error) {
-      console.error('Error signing order message:', error);
-      return null;
-    }
-  }
-  
-  // Verify an order signature
-  public async verifyOrderSignature(
-    signature: string,
-    message: string,
-    signerAddress: string
-  ): Promise<boolean> {
-    try {
-      console.log('Verifying signature:', { signature, message, signerAddress });
-      
-      // Use viem's verifyMessage function to verify the signature
-      const isValid = await verifyMessage({
-        address: signerAddress as `0x${string}`,
-        message,
-        signature: signature as `0x${string}`
-      });
-      
-      console.log('Signature verification result:', isValid);
-      return isValid;
-    } catch (error) {
-      console.error('Error verifying signature:', error);
-      return false;
-    }
-  }
-
-  // Request a payment using SDK directly with integrated signature
+  // Request a payment using SDK directly
   public async requestPaymentWithSDK(
     amount: number,
     currency: FiatCurrency,
     orderId?: string,
-    metadata?: { 
-      productName?: string; 
-      ownerAddress?: string;
-      buyerAddress?: string;
-    }
+    metadata?: { productName?: string; ownerAddress?: string }
   ): Promise<Payment> {
     try {
       // Create a unique memo if not provided
@@ -243,35 +160,15 @@ class YodlService {
       
       console.log(`Requesting payment with SDK for order: ${memo}`, { amount, currency, metadata });
       
-      const orderInfo: OrderInfo = { 
+      // Store order info in localStorage for retrieval after payment
+      this.storeOrderInfo(memo, { 
         amount, 
         currency, 
         timestamp: new Date().toISOString(),
-        orderId: memo,
-        productName: metadata?.productName,
-        ownerAddress: metadata?.ownerAddress,
-        buyerAddress: metadata?.buyerAddress
-      };
-      
-      // If we have a buyer address, try to get a signature
-      if (metadata?.buyerAddress) {
-        try {
-          // Create message to sign
-          const messageToSign = this.createOrderSignMessage(memo, amount, currency);
-          orderInfo.messageToSign = messageToSign;
-          
-          // Store order info right away (will update with signature later if successful)
-          this.storeOrderInfo(memo, orderInfo);
-          
-          // Note: The actual signature will be handled in the component calling this method
-          // since we need more direct access to the wallet for signing
-        } catch (error) {
-          console.error('Error preparing signature:', error);
-        }
-      } else {
-        // No buyer address, just store the order info without signature
-        this.storeOrderInfo(memo, orderInfo);
-      }
+        orderId: memo, // Store the order ID explicitly
+        productName: metadata?.productName, // Store product name if provided
+        ownerAddress: metadata?.ownerAddress // Store owner address if provided
+      });
       
       // Create payment config based on whether we're in an iframe or not
       const paymentConfig: any = {
@@ -295,62 +192,6 @@ class YodlService {
     } catch (error) {
       console.error('Payment failed:', error);
       throw error;
-    }
-  }
-
-  // Update an order with signature information
-  public updateOrderWithSignature(
-    orderId: string,
-    signature: string,
-    messageToSign: string
-  ): boolean {
-    try {
-      // Get existing order info
-      const orderInfo = this.getOrderInfo(orderId);
-      if (!orderInfo) {
-        console.error('Cannot update signature: Order not found');
-        return false;
-      }
-      
-      // Update with signature data
-      orderInfo.signature = signature;
-      orderInfo.messageToSign = messageToSign;
-      
-      // Store updated order
-      this.storeOrderInfo(orderId, orderInfo);
-      return true;
-    } catch (error) {
-      console.error('Error updating order with signature:', error);
-      return false;
-    }
-  }
-
-  // Get QR code data with signature information
-  public getOrderQRData(orderId: string): string {
-    try {
-      const orderInfo = this.getOrderInfo(orderId);
-      if (!orderInfo) {
-        return JSON.stringify({ orderId, error: 'Order not found' });
-      }
-      
-      // Create QR data object with essential info
-      const qrData = {
-        orderId,
-        amount: orderInfo.amount,
-        currency: orderInfo.currency,
-        productName: orderInfo.productName,
-        timestamp: orderInfo.timestamp,
-        buyerAddress: orderInfo.buyerAddress,
-        signature: orderInfo.signature,
-        messageToSign: orderInfo.messageToSign,
-        txHash: orderInfo.txHash,
-        status: orderInfo.status || 'pending'
-      };
-      
-      return JSON.stringify(qrData);
-    } catch (error) {
-      console.error('Error generating QR data:', error);
-      return JSON.stringify({ orderId, error: 'Failed to generate QR data' });
     }
   }
 
@@ -567,7 +408,7 @@ class YodlService {
       
       // Try to find a payment with matching memo
       // Note: This requires the Yodl SDK to expose this information
-      // If not available through SDK, you would need to use Yodl APIs
+      // If not available through SDK, you would need to use Yodl API
       
       console.log('Pending payments:', pendingPayments);
       
