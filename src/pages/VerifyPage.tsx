@@ -8,114 +8,176 @@ import { getShopByOwnerAddress, generateTelegramLink, openUrl } from '@/lib/util
 import shopsData from "@/config/shops.json";
 import html2canvas from 'html2canvas';
 import QRCode from 'qrcode.react';
+import { OrderInfo } from '@/lib/yodl';
+import { verifyMessage } from 'viem';
 
-interface OrderDetails {
+interface VerifyParams {
   orderId: string;
-  status: 'pending' | 'completed' | 'failed';
-  amount: number;
-  currency: string;
   txHash?: string;
-  timestamp?: string;
-  productName?: string;
-  ownerAddress?: string;
-  senderAddress?: string;
-  productId?: string;
 }
 
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  currency: string;
-  emoji: string;
-  inStock: boolean | string;
+interface VerificationStatus {
+  valid: boolean;
+  checked: boolean;
+  error?: string;
 }
 
 const VerifyPage: React.FC = () => {
-  const { orderId, txHash } = useParams<{ orderId: string; txHash?: string }>();
-  const [order, setOrder] = useState<OrderDetails | null>(null);
+  const { orderId, txHash } = useParams<VerifyParams>();
   const [loading, setLoading] = useState<boolean>(true);
+  const [order, setOrder] = useState<OrderInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [shopInfo, setShopInfo] = useState<any>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const previewCardRef = useRef<HTMLDivElement>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(false);
+  const [signatureVerification, setSignatureVerification] = useState<VerificationStatus>({
+    valid: false,
+    checked: false
+  });
+
+  // Check if device is mobile
+  useEffect(() => {
+    const checkIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    
+    checkIsMobile();
+    window.addEventListener('resize', checkIsMobile);
+    
+    return () => {
+      window.removeEventListener('resize', checkIsMobile);
+    };
+  }, []);
+
+  // Verify signature
+  const verifyOrderSignature = async (order: OrderInfo) => {
+    try {
+      if (!order.signature || !order.messageToSign || !order.buyerAddress) {
+        console.log("Order doesn't have signature verification data");
+        return { valid: false, checked: true, error: "No signature data available" };
+      }
+      
+      console.log('Verifying signature for order:', order.orderId);
+      console.log('Signature:', order.signature);
+      console.log('Message:', order.messageToSign);
+      console.log('Buyer address:', order.buyerAddress);
+      
+      // Verify using viem
+      const isValid = await verifyMessage({
+        address: order.buyerAddress as `0x${string}`,
+        message: order.messageToSign,
+        signature: order.signature as `0x${string}`
+      });
+      
+      console.log('Signature verification result:', isValid);
+      return { valid: isValid, checked: true };
+    } catch (error) {
+      console.error('Error verifying signature:', error);
+      return { 
+        valid: false, 
+        checked: true, 
+        error: error instanceof Error ? error.message : "Unknown error verifying signature" 
+      };
+    }
+  };
 
   useEffect(() => {
-    const loadOrderData = async () => {
+    if (!orderId) {
+      setError('No order ID provided');
+      setLoading(false);
+      return;
+    }
+    
+    const getOrderDetails = async () => {
       try {
-        if (!orderId) {
-          setError('No order ID provided');
-          setLoading(false);
-          return;
-        }
-
-        // Try to get order info from localStorage first
+        // Try to get the order from localStorage first
         const storedOrderInfo = yodlService.getOrderInfo(orderId);
         
         if (storedOrderInfo) {
-          setOrder({
-            orderId,
-            ...storedOrderInfo,
-            txHash: txHash || storedOrderInfo.txHash,
-            status: storedOrderInfo.status || 'pending'
-          });
+          console.log('Order info found in storage:', storedOrderInfo);
+          setOrder(storedOrderInfo);
           
-          // Set shop info if owner address is available
+          // Try to get shop info if ownerAddress is available
           if (storedOrderInfo.ownerAddress) {
             const shop = getShopByOwnerAddress(storedOrderInfo.ownerAddress);
             setShopInfo(shop);
           }
           
-          // Find product details if productId is available
-          if (storedOrderInfo.productId) {
-            const productDetails = shopsData.products.find(
-              (p: Product) => p.id === storedOrderInfo.productId
-            );
-            if (productDetails) {
-              setProduct(productDetails);
-            }
+          // If we have txHash from params and not in order, update it
+          if (txHash && !storedOrderInfo.txHash) {
+            storedOrderInfo.txHash = txHash;
+            storedOrderInfo.status = 'completed';
+            yodlService.storeOrderInfo(orderId, storedOrderInfo);
           }
-        } else if (txHash) {
-          // If not in localStorage but we have txHash, try to fetch from API
-          try {
-            const paymentDetails = await yodlService.fetchPaymentDetails(txHash);
-            
-            if (paymentDetails) {
-              const orderData = {
-                orderId,
-                txHash,
-                amount: parseFloat(paymentDetails.amount || paymentDetails.tokenOutAmount || paymentDetails.invoiceAmount || '0'),
-                currency: paymentDetails.currency || paymentDetails.tokenOutSymbol || paymentDetails.invoiceCurrency || 'UNKNOWN',
-                status: 'completed' as const,
-                timestamp: paymentDetails.timestamp || paymentDetails.blockTimestamp || paymentDetails.created || new Date().toISOString(),
-                senderAddress: paymentDetails.from || paymentDetails.senderAddress || '',
-              };
-              
-              setOrder(orderData);
-              
-              // Store this info for future reference
-              yodlService.storeOrderInfo(orderId, orderData);
-            } else {
-              setError('Payment details not found');
-            }
-          } catch (apiError) {
-            console.error('Error fetching payment details:', apiError);
-            setError('Failed to verify payment');
+          
+          // Verify signature if available
+          if (storedOrderInfo.signature && storedOrderInfo.messageToSign && storedOrderInfo.buyerAddress) {
+            const verificationResult = await verifyOrderSignature(storedOrderInfo);
+            setSignatureVerification(verificationResult);
           }
         } else {
-          // No stored data and no txHash
-          setError('Order information not found');
+          // If we don't have stored order info, let's create a basic one
+          console.log('No stored order info found, creating basic order');
+          
+          // Try to parse JSON from QR code if order ID looks like stringified JSON
+          try {
+            if (orderId.startsWith('{') && orderId.endsWith('}')) {
+              const parsedOrder = JSON.parse(orderId);
+              console.log('Parsed order from JSON:', parsedOrder);
+              if (parsedOrder.orderId) {
+                // If this is a JSON object with order details
+                setOrder(parsedOrder);
+                
+                // Store this order info for future reference
+                yodlService.storeOrderInfo(parsedOrder.orderId, parsedOrder);
+                
+                // Verify signature if available
+                if (parsedOrder.signature && parsedOrder.messageToSign && parsedOrder.buyerAddress) {
+                  const verificationResult = await verifyOrderSignature(parsedOrder);
+                  setSignatureVerification(verificationResult);
+                }
+                
+                setLoading(false);
+                return;
+              }
+            }
+          } catch (e) {
+            console.error('Error parsing order ID as JSON:', e);
+          }
+          
+          // Extract product ID if this looks like a product order
+          let productInfo = null;
+          if (orderId.startsWith('product_')) {
+            const productId = orderId.split('_')[1];
+            productInfo = shopsData.products.find((p: any) => p.id === productId);
+          }
+          
+          // Create a basic order with the info we have
+          const basicOrder: OrderInfo = {
+            orderId: orderId,
+            amount: productInfo?.price || 0,
+            currency: productInfo?.currency || 'USD',
+            timestamp: new Date().toISOString(),
+            productName: productInfo?.name,
+            status: txHash ? 'completed' : 'pending',
+            txHash
+          };
+          
+          setOrder(basicOrder);
+          
+          // Store this basic order
+          yodlService.storeOrderInfo(orderId, basicOrder);
         }
-      } catch (e) {
-        console.error('Error loading order data:', e);
-        setError('Failed to load order data');
+      } catch (error) {
+        console.error('Error fetching order details:', error);
+        setError('Could not load order details.');
       } finally {
         setLoading(false);
       }
     };
-
-    loadOrderData();
+    
+    getOrderDetails();
   }, [orderId, txHash]);
 
   // Function to save verification to gallery
@@ -175,6 +237,46 @@ const VerifyPage: React.FC = () => {
     let shopName = shopInfo?.name || "the shop";
     
     return `Hey, I just bought ${productName} from ${shopName}. Where can I pick it up from?`;
+  };
+
+  // Determine product emoji
+  const getProductEmoji = () => {
+    if (order?.productName) {
+      // Try to find from product data
+      const product = shopsData.products.find(
+        (p: any) => p.name === order.productName
+      );
+      if (product?.emoji) return product.emoji;
+    }
+    
+    // Or try from product ID in order ID
+    if (orderId && orderId.startsWith('product_')) {
+      const productId = orderId.split('_')[1];
+      const product = shopsData.products.find((p: any) => p.id === productId);
+      if (product?.emoji) return product.emoji;
+    }
+    
+    return '🛒'; // Default shopping cart emoji
+  };
+
+  // Handle contact seller click
+  const handleContactSeller = () => {
+    if (!shopInfo || !shopInfo.telegramHandle) return;
+    
+    // Create the message with order details
+    const message = `Hi, I'm inquiring about my order: ${orderId}. I bought ${order?.productName || 'a product'} from your shop.`;
+    
+    // Generate and open Telegram link
+    const telegramLink = generateTelegramLink(shopInfo.telegramHandle, message);
+    openUrl(telegramLink);
+  };
+
+  // Show transaction details on Yodl
+  const viewTransaction = () => {
+    if (!order?.txHash) return;
+    
+    const txLink = `https://yodl.me/tx/${order.txHash}`;
+    openUrl(txLink);
   };
 
   return (
@@ -252,12 +354,10 @@ const VerifyPage: React.FC = () => {
               <div className="flex justify-between items-start">
                 <span className="text-black dark:text-foreground/70">Transaction:</span>
                 <a
-                  href={`https://yodl.me/tx/${order.txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  onClick={viewTransaction}
                   className="text-blue-500 hover:underline font-medium text-right break-all max-w-[200px]"
                 >
-                  {order.txHash}
+                  View Receipt
                 </a>
               </div>
             )}
@@ -285,17 +385,12 @@ const VerifyPage: React.FC = () => {
               </div>
             )}
             
-            {order.senderAddress && (
+            {order.buyerAddress && (
               <div className="flex justify-between items-start">
-                <span className="text-black dark:text-foreground/70">Sender:</span>
-                <a
-                  href={`https://yodl.me/address/${order.senderAddress}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-500 hover:underline font-medium text-right break-all max-w-[200px]"
-                >
-                  {order.senderAddress}
-                </a>
+                <span className="text-black dark:text-foreground/70">Buyer:</span>
+                <span className="font-medium text-black dark:text-white">
+                  {`${order.buyerAddress.substring(0, 6)}...${order.buyerAddress.substring(order.buyerAddress.length - 4)}`}
+                </span>
               </div>
             )}
           </div>
@@ -356,8 +451,8 @@ const VerifyPage: React.FC = () => {
           </div>
           <div className="flex-1 text-white">
             <div className="flex items-center">
-              <span className="text-xl mr-1.5">{product?.emoji || '🛒'}</span>
-              <span className="font-small text-sm">{product?.name || order?.productName || 'Order Verification'}</span>
+              <span className="text-xl mr-1.5">{getProductEmoji()}</span>
+              <span className="font-small text-sm">{order?.productName || 'Order Verification'}</span>
             </div>
             
             <p className="text-green-300 font-medium text-xs mt-1.5">

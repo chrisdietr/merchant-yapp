@@ -37,22 +37,38 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
   useEffect(() => {
     if (isInIframe) {
       console.log('Component in iframe mode, payment completion is handled by YodlService listener');
-      
-      // Add safety check for iframe ethereum conflicts
-      const checkForEthereumConflict = () => {
-        try {
-          // Don't reference window.ethereum directly, just check if it exists
-          if (typeof window !== 'undefined') {
-            console.log('Running in iframe environment, making sure ethereum access is safe');
-          }
-        } catch (error) {
-          console.warn('Error checking ethereum availability:', error);
-        }
-      };
-      
-      checkForEthereumConflict();
     }
   }, [isInIframe]);
+
+  // Create a message to sign for verification
+  const prepareOrderMessage = async (orderId: string) => {
+    if (!address) {
+      console.error('Cannot prepare order message: no wallet address available');
+      return null;
+    }
+
+    console.log('Preparing order message to sign for:', orderId, 'with address:', address);
+    
+    // Create and store initial order info to prepare for signing
+    const messageToSign = YodlService.createOrderSignMessage(orderId, amount, currency);
+    
+    // Store initial order info with the message
+    const orderInfo = {
+      orderId,
+      amount,
+      currency,
+      timestamp: new Date().toISOString(),
+      productName,
+      ownerAddress,
+      buyerAddress: address,
+      messageToSign,
+    };
+    
+    // Store order info
+    YodlService.storeOrderInfo(orderId, orderInfo);
+    
+    return { messageToSign, orderInfo };
+  };
 
   // Handle message signing for order verification
   const handleSignMessage = async (orderId: string) => {
@@ -62,27 +78,28 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
         return null;
       }
       
-      // Get the stored order info
-      const orderInfo = YodlService.getOrderInfo(orderId);
-      if (!orderInfo || !orderInfo.messageToSign) {
-        console.error('No message to sign in order info');
+      // Get or create the message to sign
+      const prepared = await prepareOrderMessage(orderId);
+      if (!prepared || !prepared.messageToSign) {
+        console.error('Failed to prepare message for signing');
         return null;
       }
       
-      console.log('Signing message for order verification:', orderInfo.messageToSign);
+      const { messageToSign } = prepared;
+      console.log('Requesting wallet to sign message:', messageToSign);
       
       // Use wagmi to sign the message
       const signature = await signMessageAsync({
-        message: orderInfo.messageToSign,
+        message: messageToSign,
         account: address
       });
       
       console.log('Message signed successfully:', signature);
       
       // Update the order with the signature
-      YodlService.updateOrderWithSignature(orderId, signature, orderInfo.messageToSign);
+      YodlService.updateOrderWithSignature(orderId, signature, messageToSign);
       
-      return { signature, messageToSign: orderInfo.messageToSign };
+      return { signature, messageToSign };
     } catch (error) {
       console.error('Error signing message:', error);
       return null;
@@ -93,6 +110,22 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
   const handlePayment = async () => {
     setLoading(true);
     try {
+      console.log('Starting purchase process with address:', address);
+      
+      // First, prepare the order and get a signature
+      let signatureResult = null;
+      if (address) {
+        // Sign the message BEFORE processing payment
+        signatureResult = await handleSignMessage(uniqueOrderId);
+        if (!signatureResult) {
+          console.warn('Failed to sign verification message - continuing without verification');
+        } else {
+          console.log('Successfully signed verification message');
+        }
+      } else {
+        console.warn('No wallet address available for message signing');
+      }
+      
       // Store product metadata before initiating payment, including buyer address
       const metadata = {
         productName,
@@ -109,16 +142,6 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
         uniqueOrderId,
         metadata
       );
-
-      // After payment is initiated, sign the verification message
-      if (address) {
-        try {
-          await handleSignMessage(uniqueOrderId);
-        } catch (signError) {
-          console.error('Failed to sign order verification message:', signError);
-          // Continue with payment even if signing fails
-        }
-      }
 
       // In non-iframe mode, the SDK will handle redirects
       // In iframe mode, we might receive a response directly
