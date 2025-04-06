@@ -315,25 +315,30 @@ class YodlService {
         }
       }
       
-      // Try multiple API endpoints - the format changed recently
-      const apiEndpoints = [
-        `https://yodl.me/api/v1/payments/${formattedTxHash}`,
-        `https://api.yodl.me/v1/transactions/${formattedTxHash}`,
-        `https://api.yodl.me/v1/payments/${formattedTxHash}`
+      // Define base URLs and endpoints
+      const baseUrls = {
+        yodl: 'https://yodl.me',
+        api: 'https://api.yodl.me'
+      };
+      
+      const endpoints = [
+        { base: baseUrls.yodl, path: `/api/v1/payments/${formattedTxHash}` },
+        { base: baseUrls.api, path: `/v1/transactions/${formattedTxHash}` },
+        { base: baseUrls.api, path: `/v1/payments/${formattedTxHash}` }
       ];
       
       let lastError = null;
       
-      for (const endpoint of apiEndpoints) {
+      for (const { base, path } of endpoints) {
         try {
-          const response = await fetch(endpoint);
+          const response = await fetch(`${base}${path}`);
           if (response.ok) {
             const data = await response.json();
             console.log('Payment details retrieved from API:', data);
             return data;
           }
         } catch (error) {
-          console.warn(`API endpoint ${endpoint} failed:`, error);
+          console.warn(`API endpoint ${base}${path} failed:`, error);
           lastError = error;
         }
       }
