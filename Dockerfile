@@ -1,32 +1,32 @@
 # Build stage
-FROM oven/bun:1 AS builder
+FROM node:18 AS builder
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY bun.lockb ./
+COPY package-lock.json ./
 
-# Install dependencies without frozen lockfile
-RUN bun install --no-frozen-lockfile
+# Install dependencies with legacy peer deps to handle React version conflicts
+RUN npm install --legacy-peer-deps
 
 # Copy source files
 COPY . .
 
 # Build the application
-RUN bun run build
+RUN npm run build
 
 # Production stage
-FROM oven/bun:1 AS production
+FROM node:18 AS production
 
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY bun.lockb ./
+COPY package-lock.json ./
 
-# Install production dependencies only without frozen lockfile
-RUN bun install --no-frozen-lockfile --production
+# Install production dependencies only with legacy peer deps
+RUN npm install --legacy-peer-deps --production
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist ./dist
@@ -39,4 +39,4 @@ ENV NODE_ENV=production
 EXPOSE 3000
 
 # Start the server
-CMD ["bun", "start"]
+CMD ["npm", "start"]
