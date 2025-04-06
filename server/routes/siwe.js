@@ -109,7 +109,6 @@ router.post('/verify', async (req, res) => {
       });
     }
 
-    // Try the regular SIWE verification
     try {
       // Create SiweMessage from the message string
       const siweMessage = new SiweMessage(req.body.message);
