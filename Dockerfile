@@ -37,15 +37,15 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server ./server
 
 # Add PM2 configuration
-COPY ecosystem.config.js ./
+COPY ecosystem.config.cjs ./
 
 # Set environment variables
 ENV NODE_ENV=production
 ENV MALLOC_ARENA_MAX=2
-ENV NODE_OPTIONS="--max-old-space-size=512"
+ENV NODE_OPTIONS="--max-old-space-size=512 --experimental-specifier-resolution=node"
 
 # Expose the port your app runs on
 EXPOSE 3000
 
 # Start the server using PM2
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
+CMD ["pm2-runtime", "start", "ecosystem.config.cjs"]

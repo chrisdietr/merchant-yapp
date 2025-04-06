@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'merchant-yapp',
-    script: 'server/index.js',
+    script: './server/index.js',
     instances: 'max',
     exec_mode: 'cluster',
     autorestart: true,
@@ -10,6 +10,7 @@ module.exports = {
     env: {
       NODE_ENV: 'production'
     },
-    exp_backoff_restart_delay: 100
+    exp_backoff_restart_delay: 100,
+    node_args: '--experimental-specifier-resolution=node'
   }]
 }; 
