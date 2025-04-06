@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20-slim AS builder
+FROM node:20 AS builder
 
 WORKDIR /app
 
@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # Production stage
-FROM node:20-slim AS production
+FROM node:20 AS production
 
 WORKDIR /app
 
@@ -33,10 +33,10 @@ COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/server ./server
 
 # Set environment variables
-# ENV NODE_ENV=production
+ENV NODE_ENV=production
 
 # Expose the port your app runs on
 EXPOSE 3000
 
 # Start the server
-CMD ["npm", "start"] 
+CMD ["npm", "start"]
