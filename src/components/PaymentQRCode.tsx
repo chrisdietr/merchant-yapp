@@ -52,7 +52,9 @@ export function PaymentQRCode({ productId }: PaymentQRCodeProps) {
       )
       
       // Set the QR code value to the Yodl payment link
-      setQrValue(`https://${yodlLink}`)
+      // Use the URL constructor to ensure proper URL formatting
+      const url = new URL(`https://${yodlLink}`);
+      setQrValue(url.toString());
     }
   }, [product])
 
