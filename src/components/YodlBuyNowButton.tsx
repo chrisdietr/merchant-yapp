@@ -3,6 +3,7 @@ import { FiatCurrency } from '@yodlpay/yapp-sdk';
 import YodlService from '../lib/yodl';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from 'react-router-dom';
+import { useAccount, useSignMessage } from 'wagmi';
 
 interface YodlBuyNowButtonProps {
   amount: number;
@@ -26,6 +27,8 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
   const [loading, setLoading] = React.useState(false);
   const navigate = useNavigate();
   const isInIframe = YodlService.isInIframe();
+  const { address } = useAccount();
+  const { signMessageAsync } = useSignMessage();
 
   // Generate a unique order ID if not provided
   const uniqueOrderId = orderId || `order_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
@@ -51,28 +54,71 @@ const YodlBuyNowButton: React.FC<YodlBuyNowButtonProps> = ({
     }
   }, [isInIframe]);
 
+  // Handle message signing for order verification
+  const handleSignMessage = async (orderId: string) => {
+    try {
+      if (!address) {
+        console.error('No wallet address available for message signing');
+        return null;
+      }
+      
+      // Get the stored order info
+      const orderInfo = YodlService.getOrderInfo(orderId);
+      if (!orderInfo || !orderInfo.messageToSign) {
+        console.error('No message to sign in order info');
+        return null;
+      }
+      
+      console.log('Signing message for order verification:', orderInfo.messageToSign);
+      
+      // Use wagmi to sign the message
+      const signature = await signMessageAsync({
+        message: orderInfo.messageToSign,
+        account: address
+      });
+      
+      console.log('Message signed successfully:', signature);
+      
+      // Update the order with the signature
+      YodlService.updateOrderWithSignature(orderId, signature, orderInfo.messageToSign);
+      
+      return { signature, messageToSign: orderInfo.messageToSign };
+    } catch (error) {
+      console.error('Error signing message:', error);
+      return null;
+    }
+  };
+
   // Handle payment via SDK
   const handlePayment = async () => {
     setLoading(true);
     try {
-      // Store product metadata before initiating payment
-      YodlService.storeOrderInfo(uniqueOrderId, {
-        amount,
-        currency,
+      // Store product metadata before initiating payment, including buyer address
+      const metadata = {
         productName,
         ownerAddress,
-        timestamp: new Date().toISOString()
-      });
+        buyerAddress: address
+      };
       
-      console.log('Initiating payment with product name:', productName, 'in iframe mode:', isInIframe);
+      console.log('Initiating payment with metadata:', metadata, 'in iframe mode:', isInIframe);
       
       // Use SDK to request payment with memo
       const response = await YodlService.requestPaymentWithSDK(
         amount,
         currency,
         uniqueOrderId,
-        { productName, ownerAddress } // Pass metadata directly
+        metadata
       );
+
+      // After payment is initiated, sign the verification message
+      if (address) {
+        try {
+          await handleSignMessage(uniqueOrderId);
+        } catch (signError) {
+          console.error('Failed to sign order verification message:', signError);
+          // Continue with payment even if signing fails
+        }
+      }
 
       // In non-iframe mode, the SDK will handle redirects
       // In iframe mode, we might receive a response directly

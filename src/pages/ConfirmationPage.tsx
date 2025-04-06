@@ -8,6 +8,8 @@ import { formatCurrency } from '../utils/currency';
 import { getShopByOwnerAddress, generateTelegramLink, openUrl } from '@/lib/utils';
 import html2canvas from 'html2canvas';
 import shopsData from "@/config/shops.json";
+import { OrderInfo } from '@/lib/yodl';
+import { Shop } from '@/lib/types';
 
 // Order details interface
 interface OrderDetails {
@@ -19,6 +21,9 @@ interface OrderDetails {
   timestamp?: string;
   productName?: string;
   ownerAddress?: string;
+  signature?: string;
+  messageToSign?: string;
+  buyerAddress?: string;
 }
 
 // Direct lookup for product names - will use product ID from orderId
@@ -190,8 +195,9 @@ const ConfirmationPage: React.FC = () => {
       if (storedOrderInfo) {
         yodlService.storeOrderInfo(orderId, {
           ...storedOrderInfo,
+          orderId,
           txHash: payment.txHash,
-          status: 'completed', // Ensure status stays as completed
+          status: 'completed',
           timestamp: storedOrderInfo.timestamp || new Date().toISOString(),
         });
       }
@@ -332,8 +338,16 @@ const ConfirmationPage: React.FC = () => {
       });
   };
 
-  // Get the order QR code value - includes transaction hash if available
+  // Get the order QR code value - includes transaction hash and signature data if available
   const getOrderQRValue = () => {
+    // First check if we have signature data to include
+    if (order.signature && order.messageToSign && order.buyerAddress) {
+      console.log('Using signature data for QR code');
+      // Include signature verification data in the QR code
+      return yodlService.getOrderQRData(order.orderId);
+    }
+    
+    // Fallback to URL-based verification
     const baseUrl = window.location.origin;
     if (order.txHash) {
       return `${baseUrl}/verify/${order.orderId}/${order.txHash}`;
