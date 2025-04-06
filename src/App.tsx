@@ -34,7 +34,8 @@ export default function App() {
                     <Route path="/payment" element={<Payment />} />
                     <Route path="/yodl" element={<YodlPaymentPage />} />
                     <Route path="/confirmation/:orderId" element={<ConfirmationPage />} />
-                    <Route path="/verify/:orderId/:txHash?" element={<VerifyPage />} />
+                    <Route path="/verify/:orderId/:txHash" element={<VerifyPage />} />
+                    <Route path="/verify/:orderId" element={<VerifyPage />} />
                     <Route path="/product" element={<ProductPage />} />
                     <Route 
                       path="/admin/scanner" 
