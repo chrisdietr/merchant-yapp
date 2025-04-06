@@ -1,5 +1,5 @@
 # Build stage
-FROM node:20 AS builder
+FROM oven/bun:1 AS builder
 
 WORKDIR /app
 
@@ -8,16 +8,16 @@ COPY package*.json ./
 COPY bun.lockb ./
 
 # Install dependencies
-RUN npm ci
+RUN bun install
 
 # Copy source files
 COPY . .
 
 # Build the application
-RUN npm run build
+RUN bun run build
 
 # Production stage
-FROM node:20 AS production
+FROM oven/bun:1 AS production
 
 WORKDIR /app
 
@@ -26,7 +26,7 @@ COPY package*.json ./
 COPY bun.lockb ./
 
 # Install production dependencies only
-RUN npm ci --production
+RUN bun install --production
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist ./dist
@@ -39,4 +39,4 @@ ENV NODE_ENV=production
 EXPOSE 3000
 
 # Start the server
-CMD ["npm", "start"]
+CMD ["bun", "start"]
