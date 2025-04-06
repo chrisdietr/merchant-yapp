@@ -35,6 +35,10 @@ COPY --from=builder /app/server ./server
 # Set environment variables
 ENV NODE_ENV=production
 
+# Add memory management configurations
+ENV MALLOC_ARENA_MAX=2
+ENV NODE_OPTIONS="--max-old-space-size=512"
+
 # Expose the port your app runs on
 EXPOSE 3000
 
