@@ -7,8 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY bun.lockb ./
 
-# Install dependencies
-RUN bun install
+# Install dependencies without frozen lockfile
+RUN bun install --no-frozen-lockfile
 
 # Copy source files
 COPY . .
@@ -25,8 +25,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY bun.lockb ./
 
-# Install production dependencies only
-RUN bun install --production
+# Install production dependencies only without frozen lockfile
+RUN bun install --no-frozen-lockfile --production
 
 # Copy built assets from builder stage
 COPY --from=builder /app/dist ./dist
