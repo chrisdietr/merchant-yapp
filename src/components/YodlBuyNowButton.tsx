@@ -1,13 +1,12 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { WalletSelectorButton } from './WalletSelector';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useWalletClient, usePublicClient, useAccount } from 'wagmi';
 import { getAddress } from 'viem';
 import yodlService from '@/lib/yodl';
 import { useNavigate } from 'react-router-dom';
 import { FiatCurrency } from '@yodlpay/yapp-sdk';
 import shopsData from "@/config/shops.json";
-import Skeleton from 'react-loading-skeleton';
 import { Loader2 } from 'lucide-react';
 
 // Props interface for the component
@@ -34,16 +33,13 @@ export const YodlBuyNowButton = ({
   const publicClient = usePublicClient();
   const navigate = useNavigate();
 
-  // Check Yodl SDK initialization status
-  const isYodlReady = yodlService.isInitialized();
-
   // Handle buy button click
   const handleBuyClick = useCallback(async () => {
     // Continue with payment if wallet is connected
     if (userAddress && isConnected && walletClient) {
       await handlePaymentRequest();
     } 
-    // Don't do anything here - WalletSelectorButton will handle the wallet connection process
+    // Otherwise the connect button will handle wallet connection
   }, [userAddress, isConnected, walletClient, amount, currency, productId, productName, ownerAddress]);
 
   // Handle payment request
@@ -71,7 +67,7 @@ export const YodlBuyNowButton = ({
       // Store order info in localStorage before payment
       const initialOrderInfo = {
         orderId,
-        status: 'pending',
+        status: 'pending' as const,
         amount,
         currency,
         productId,
@@ -84,32 +80,40 @@ export const YodlBuyNowButton = ({
       yodlService.storeOrderInfo(orderId, initialOrderInfo);
       
       // Now request payment with the SDK
-      const requestResponse = await yodlService.requestPaymentWithSDK({
-        orderId,
+      const requestResponse = await yodlService.requestPaymentWithSDK(
         amount,
         currency,
-      });
+        orderId,
+        {
+          productName,
+          ownerAddress,
+          buyerAddress: userAddress
+        }
+      );
       
       console.log('Payment request response:', requestResponse);
       
-      // If payment is successful, redirect to confirmation page
-      if (requestResponse && requestResponse.success) {
-        // Redirect to confirmation page
-        navigate(`/confirmation/${orderId}`);
-      } else {
-        console.error('Payment request failed');
-        setLoading(false);
+      // If we're in iframe mode and have a response with txHash, navigate to confirmation
+      if (yodlService.isInIframe() && requestResponse && requestResponse.txHash) {
+        navigate(`/confirmation/${orderId}?txHash=${requestResponse.txHash}&chainId=${requestResponse.chainId}`);
       }
+      // SDK will handle redirects in non-iframe mode
     } catch (error) {
       console.error('Error during payment process:', error);
+      alert(`Payment failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setLoading(false);
     }
   };
 
   // Display loading state during payment process
   const renderButton = () => {
-    if (!isYodlReady) {
-      return <Skeleton height={40} />;
+    // Check if the yodlService is available
+    if (!yodlService) {
+      return (
+        <Button disabled className="w-full">
+          Loading...
+        </Button>
+      );
     }
     
     if (loading) {
@@ -123,9 +127,19 @@ export const YodlBuyNowButton = ({
     
     if (!isConnected) {
       return (
-        <WalletSelectorButton fullWidth onConnect={handleBuyClick}>
-          Buy Now for {amount} {currency}
-        </WalletSelectorButton>
+        <ConnectButton.Custom>
+          {({ openConnectModal }) => (
+            <Button 
+              onClick={() => {
+                openConnectModal();
+                // After wallet is connected, handleBuyClick will be triggered via useEffect
+              }}
+              className="w-full"
+            >
+              Connect Wallet to Buy ({amount} {currency})
+            </Button>
+          )}
+        </ConnectButton.Custom>
       );
     }
     
@@ -138,6 +152,13 @@ export const YodlBuyNowButton = ({
       </Button>
     );
   };
+
+  // When wallet connects, try to initiate payment
+  useEffect(() => {
+    if (isConnected && userAddress && walletClient && !loading && !paymentRequested) {
+      handleBuyClick();
+    }
+  }, [isConnected, userAddress, walletClient, handleBuyClick, loading, paymentRequested]);
 
   return renderButton();
 };
