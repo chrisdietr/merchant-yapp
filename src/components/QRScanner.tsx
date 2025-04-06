@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { QrReader } from 'react-qr-reader';
+import QrScanner from 'react-qr-scanner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface QRScannerProps {
@@ -37,18 +37,13 @@ const QRScanner: React.FC<QRScannerProps> = ({ onResult, onError, className }) =
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       ) : (
-        <QrReader
+        <QrScanner
           constraints={{ facingMode: 'environment' }}
-          onResult={handleScan}
-          scanDelay={500}
-          videoId="qr-video"
-          videoStyle={{ 
-            width: '100%', 
-            height: '100%', 
-            objectFit: 'cover' 
-          }}
-          containerStyle={{ 
-            width: '100%', 
+          onScan={handleScan}
+          onError={handleError}
+          delay={500}
+          style={{ 
+            width: '100%',
             aspectRatio: '4/3',
             borderRadius: '0.375rem',
             overflow: 'hidden'
