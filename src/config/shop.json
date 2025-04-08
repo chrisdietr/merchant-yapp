@@ -1,0 +1,64 @@
+{
+  "shop": {
+    "name": "Crypto Merchant Shop",
+    "owner": "0x123abc456def789ghi",
+    "telegramHandle": "cryptomerchant",
+    "webhookUrl": "https://example.com/webhook"
+  },
+  "products": [
+    {
+      "id": "1",
+      "name": "Premium Coffee",
+      "description": "Freshly roasted single-origin coffee beans",
+      "price": 12.99,
+      "currency": "USD",
+      "emoji": "☕",
+      "inStock": true
+    },
+    {
+      "id": "2",
+      "name": "Crypto Hoodie",
+      "description": "Comfortable hoodie with crypto design",
+      "price": 49.99,
+      "currency": "USD",
+      "emoji": "👕",
+      "inStock": true
+    },
+    {
+      "id": "3",
+      "name": "Hardware Wallet",
+      "description": "Secure your crypto assets",
+      "price": 79.99,
+      "currency": "USD",
+      "emoji": "🔒",
+      "inStock": true
+    },
+    {
+      "id": "4",
+      "name": "NFT Art Print",
+      "description": "Limited edition art print with certificate",
+      "price": 199.99,
+      "currency": "USD",
+      "emoji": "🖼️",
+      "inStock": false
+    },
+    {
+      "id": "5",
+      "name": "Blockchain Book",
+      "description": "Comprehensive guide to blockchain technology",
+      "price": 24.99,
+      "currency": "USD",
+      "emoji": "📚",
+      "inStock": true
+    },
+    {
+      "id": "6",
+      "name": "Mining Rig Cooling Fan",
+      "description": "High-performance cooling fan for mining rigs",
+      "price": 34.99,
+      "currency": "USD",
+      "emoji": "💨",
+      "inStock": true
+    }
+  ]
+}
