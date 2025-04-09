@@ -37,7 +37,6 @@ const OrderConfirmation = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showQrCode, setShowQrCode] = useState(false);
   const orderId = searchParams.get("orderId");
-  const isSeller = searchParams.get("seller") === "true";
   const shop = shopConfig.shops[0];
   const shopTelegramHandle = shop?.telegramHandle;
 
@@ -146,8 +145,8 @@ const OrderConfirmation = () => {
 
   const isSuccess = paymentResult && paymentResult.txHash;
   const receiptData = JSON.stringify({ orderId, paymentResult, orderDetails });
-  const sellerConfirmationUrl = `${window.location.origin}/confirmation?orderId=${orderId}&seller=true`;
-  const receiptQrValue = sellerConfirmationUrl;
+  const confirmationUrl = `${window.location.origin}/confirmation?orderId=${orderId}`;
+  const receiptQrValue = confirmationUrl;
   const yodlTxUrl = isSuccess ? `https://yodl.me/tx/${paymentResult.txHash}` : '';
 
   // Construct pre-filled Telegram message
@@ -185,12 +184,10 @@ const OrderConfirmation = () => {
                   <CheckCircle className="h-16 w-16 text-green-500" />
                 </div>
                 <CardTitle className="text-2xl text-center">
-                  {isSeller ? "Order Confirmed" : "Payment Successful!"}
+                  Payment Successful!
                 </CardTitle>
                 <CardDescription className="text-center">
-                  {isSeller 
-                    ? "This order has been confirmed by the customer."
-                    : "Your order has been confirmed and is being processed."}
+                  Your order has been confirmed and is being processed.
                 </CardDescription>
                 {isSuccess && (
                   <div className="mt-4 flex justify-center">
