@@ -45,59 +45,57 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
   const merchantAddress = adminConfig.admins[0]?.address || "";
   const merchantEns = adminConfig.admins[0]?.ens || "";
 
-  // Add postMessage listener for payment completion
+  // Add postMessage listener FOR messages coming FROM Yodl iframe/SDK
   useEffect(() => {
-    console.log("Setting up YodlContext payment message listener");
+    console.log("Setting up YodlContext message listener for events FROM Yodl SDK");
     
     const handleMessage = (event: MessageEvent) => {
-      // Only process messages that might be payment-related
-      // Ignore wallet provider messages (MetaMask, Rabby, etc.)
+      // Ensure message is likely from Yodl SDK/iframe
+      // It might send messages without a specific 'type'
       if (event.data && typeof event.data === 'object' && 
-          !event.data.target && // Wallet messages typically have a target property
-          (event.data.type === 'payment_complete' || event.data.txHash)) {
+          !event.data.target && // Ignore browser extension messages
+          event.data.txHash &&   // Must have a txHash
+          (event.data.orderId || event.data.memo)) { // Must have an order identifier
         
-        console.log("YodlContext received payment-related message:", event.origin, event.data);
+        // Check if it's already the specific type we broadcast later
+        if (event.data.type === 'payment_complete') {
+           console.log("YodlContext: Received already formatted payment_complete message. Ignoring to prevent loops.");
+           return;
+        }
         
-        // Handle payment complete event from Yodl
-        if (event.data.type === 'payment_complete' || 
-            (event.data.txHash && (event.data.orderId || event.data.memo))) {
-          console.log("Payment data detected in message:", event.data);
+        console.log("YodlContext: Received potential payment completion from Yodl SDK/iframe:", event.data);
           
-          // Extract transaction data
-          const txHash = event.data.txHash;
-          const chainId = event.data.chainId;
-          const orderId = event.data.orderId || event.data.memo;
+        // Extract transaction data
+        const txHash = event.data.txHash;
+        const chainId = event.data.chainId;
+        const orderId = event.data.orderId || event.data.memo;
+        
+        if (txHash && orderId) {
+          console.log(`YodlContext: Storing payment result for order ${orderId} from received message:`, { txHash, chainId });
           
-          if (txHash && orderId) {
-            console.log(`Storing payment result for order ${orderId}:`, { txHash, chainId });
+          // Store payment result in localStorage
+          localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
+          
+          // --- Broadcast a *standardized* message --- 
+          try {
+            const standardizedMessage = {
+              type: 'payment_complete', // ** Crucial: Use the standard type **
+              txHash,
+              chainId,
+              orderId
+            };
             
-            // Store payment result in localStorage
-            localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
-            
-            // Broadcast to all potential listeners
-            try {
-              // Send to parent window if we're in an iframe
-              if (isInIframeValue && window.parent) {
-                console.log("Broadcasting payment completion to parent window");
-                window.parent.postMessage({
-                  type: 'payment_complete',
-                  txHash,
-                  chainId,
-                  orderId
-                }, '*');
-              }
-              
-              // Also broadcast to this window for any local listeners
-              console.log("Broadcasting payment completion to local window");
-              window.postMessage({
-                type: 'payment_complete',
-                txHash,
-                chainId,
-                orderId
-              }, '*');
-            } catch (e) {
-              console.error("Error broadcasting payment completion:", e);
+            // Broadcast to parent (if in iframe)
+            if (isInIframeValue && window.parent) {
+              console.log("YodlContext: Broadcasting standardized payment_complete to parent window");
+              window.parent.postMessage(standardizedMessage, '*');
             }
+            
+            // Broadcast locally (for PaymentBridge or other listeners)
+            console.log("YodlContext: Broadcasting standardized payment_complete to local window");
+            window.postMessage(standardizedMessage, '*');
+          } catch (e) {
+            console.error("YodlContext: Error broadcasting standardized payment completion:", e);
           }
         }
       }
@@ -117,35 +115,36 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         if (paymentResult && paymentResult.txHash) {
           console.log('Payment detected in URL:', paymentResult);
           
-          // Extract orderId from memo if available (using a type-safe approach)
           const orderId = (paymentResult as any).memo || (paymentResult as any).orderId;
           
           if (orderId) {
-            // Store payment result
-            localStorage.setItem(`payment_${orderId}`, JSON.stringify({
-              txHash: paymentResult.txHash,
-              chainId: paymentResult.chainId
-            }));
+            const txHash = paymentResult.txHash;
+            const chainId = paymentResult.chainId;
             
-            // Broadcast payment completion
+            // Store payment result
+            localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
+            console.log(`YodlContext: Stored payment result for order ${orderId} from URL:`, { txHash, chainId });
+            
+            // --- Broadcast the standardized message --- 
             try {
-              window.postMessage({
-                type: 'payment_complete',
-                txHash: paymentResult.txHash,
-                chainId: paymentResult.chainId,
-                orderId: orderId
-              }, '*');
+              const standardizedMessage = {
+                type: 'payment_complete', // ** Use the standard type **
+                txHash,
+                chainId,
+                orderId
+              };
               
+              // Broadcast locally
+              console.log("YodlContext: Broadcasting standardized payment_complete from URL check");
+              window.postMessage(standardizedMessage, '*');
+              
+              // Broadcast to parent if needed
               if (isInIframeValue && window.parent) {
-                window.parent.postMessage({
-                  type: 'payment_complete',
-                  txHash: paymentResult.txHash,
-                  chainId: paymentResult.chainId,
-                  orderId: orderId
-                }, '*');
+                 console.log("YodlContext: Broadcasting standardized payment_complete from URL check to parent");
+                 window.parent.postMessage(standardizedMessage, '*');
               }
             } catch (e) {
-              console.error("Error broadcasting URL payment completion:", e);
+              console.error("YodlContext: Error broadcasting URL payment completion:", e);
             }
           }
         }
@@ -191,25 +190,8 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         throw new Error("No merchant address or ENS configured in admin.json");
       }
       
-      // For iframe scenarios, use the current URL as the redirect URL
-      // This keeps everything in the same context
-      let redirectUrl = params.redirectUrl;
-      if (!redirectUrl) {
-        redirectUrl = window.location.href.split('?')[0]; // Use base URL without params
-        
-        // If we're not on the confirmation page, explicitly set it
-        if (!redirectUrl.includes('/confirmation')) {
-          redirectUrl = generateConfirmationUrl(params.orderId);
-        }
-        
-        // Add orderId if not already present
-        if (!redirectUrl.includes('orderId=')) {
-          const separator = redirectUrl.includes('?') ? '&' : '?';
-          redirectUrl = `${redirectUrl}${separator}orderId=${params.orderId}`;
-        }
-      }
-      
-      // For mobile devices, ensure the redirect URL uses the full origin to avoid iframe issues
+      // Determine redirectUrl (simplified)
+      let redirectUrl = params.redirectUrl || generateConfirmationUrl(params.orderId);
       if (isMobile && !redirectUrl.startsWith('http')) {
         redirectUrl = new URL(redirectUrl, window.location.origin).toString();
       }
@@ -226,7 +208,6 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
       
       // Pre-store order data
       try {
-        const orderId = params.orderId;
         const orderData = {
           name: params.description,
           price: params.amount,
@@ -234,13 +215,13 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
           emoji: params.metadata?.emoji || '💰',
           timestamp: new Date().toISOString(),
         };
-        localStorage.setItem(`order_${orderId}`, JSON.stringify(orderData));
-        console.log(`Saved order data for ${orderId} before payment request`);
+        localStorage.setItem(`order_${params.orderId}`, JSON.stringify(orderData));
+        console.log(`Saved order data for ${params.orderId} before payment request`);
       } catch (e) {
         console.warn('Could not save order data to localStorage', e);
       }
-      
-      // Request payment - this will open Yodl UI
+            
+      // Request payment
       const paymentResult = await yodl.requestPayment(recipientIdentifier, {
         amount: params.amount,
         currency: params.currency as FiatCurrency,
@@ -250,31 +231,34 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
 
       console.log("Payment request completed with result:", paymentResult);
 
-      // If we got a direct result with txHash, handle it
+      // If we got an immediate result with txHash, handle it
       if (paymentResult?.txHash) {
         console.log("Got direct payment result with txHash:", paymentResult.txHash);
         
-        localStorage.setItem(`payment_${params.orderId}`, JSON.stringify({
-          txHash: paymentResult.txHash,
-          chainId: paymentResult.chainId
-        }));
-        
-        // Broadcast to all windows
+        const txHash = paymentResult.txHash;
+        const chainId = paymentResult.chainId;
+        const orderId = params.orderId; // Use the orderId passed to the function
+
+        localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
+        console.log(`YodlContext: Stored direct payment result for order ${orderId}:`, { txHash, chainId });
+
+        // --- Broadcast the standardized message --- 
         try {
-          window.postMessage({
-            type: 'payment_complete',
-            txHash: paymentResult.txHash,
-            chainId: paymentResult.chainId,
-            orderId: params.orderId
-          }, '*');
+          const standardizedMessage = {
+            type: 'payment_complete', // ** Use the standard type **
+            txHash,
+            chainId,
+            orderId
+          };
           
+          // Broadcast locally
+          console.log("YodlContext: Broadcasting standardized payment_complete from direct result");
+          window.postMessage(standardizedMessage, '*');
+
+          // Broadcast to parent if needed
           if (isInIframeValue && window.parent) {
-            window.parent.postMessage({
-              type: 'payment_complete',
-              txHash: paymentResult.txHash,
-              chainId: paymentResult.chainId,
-              orderId: params.orderId
-            }, '*');
+            console.log("YodlContext: Broadcasting standardized payment_complete from direct result to parent");
+            window.parent.postMessage(standardizedMessage, '*');
           }
         } catch (e) {
           console.error("Error broadcasting direct payment completion:", e);
