@@ -47,11 +47,14 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
     console.log("Setting up YodlContext payment message listener");
     
     const handleMessage = (event: MessageEvent) => {
-      // Log all messages for debugging
-      console.log("YodlContext received message:", event.origin, event.data);
-      
-      // Accept messages from any origin for better compatibility
-      if (event.data && typeof event.data === 'object') {
+      // Only process messages that might be payment-related
+      // Ignore wallet provider messages (MetaMask, Rabby, etc.)
+      if (event.data && typeof event.data === 'object' && 
+          !event.data.target && // Wallet messages typically have a target property
+          (event.data.type === 'payment_complete' || event.data.txHash)) {
+        
+        console.log("YodlContext received payment-related message:", event.origin, event.data);
+        
         // Handle payment complete event from Yodl
         if (event.data.type === 'payment_complete' || 
             (event.data.txHash && (event.data.orderId || event.data.memo))) {

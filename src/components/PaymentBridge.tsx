@@ -11,10 +11,15 @@ const PaymentBridge: React.FC = () => {
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
-      console.log('PaymentBridge received message:', event.origin, event.data);
+      // Only process messages that might be payment-related
+      // Ignore wallet provider messages (MetaMask, Rabby, etc.)
+      if (event.data && typeof event.data === 'object' && 
+          !event.data.target && // Wallet messages typically have a target property
+          (event.data.type === 'payment_complete' || event.data.txHash)) {
+        
+        console.log('PaymentBridge received payment-related message:', event.origin, event.data);
 
-      // Handle payment completion messages
-      if (event.data && typeof event.data === 'object') {
+        // Handle payment completion messages
         if (event.data.type === 'payment_complete' && event.data.txHash && event.data.orderId) {
           console.log('PaymentBridge: Payment completion detected', event.data);
           

@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
 import { useRoutes, Routes, Route } from "react-router-dom";
 import { RainbowKitProvider, getDefaultWallets } from '@rainbow-me/rainbowkit';
 import { createConfig, http, WagmiConfig } from 'wagmi';
@@ -36,6 +36,37 @@ const queryClient = new QueryClient();
 // Wrapper for the application content with iframe detection
 function AppContent() {
   const { isInIframe } = useYodl();
+  
+  // Add CSS fixes for mobile/tablet devices
+  useEffect(() => {
+    // Add a style tag to ensure iframes are clickable on mobile/tablet
+    const style = document.createElement('style');
+    style.textContent = `
+      /* Ensure iframes are properly accessible on mobile/tablet */
+      iframe {
+        pointer-events: auto !important;
+        touch-action: auto !important;
+        z-index: 10 !important;
+      }
+      
+      /* Fix for iOS iframe scrolling */
+      .iframe-container {
+        -webkit-overflow-scrolling: touch;
+        overflow: auto;
+      }
+      
+      /* Fix for certain Yodl iframe issues */
+      iframe[src*="yodl.me"] {
+        position: relative !important;
+        min-height: 500px;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
   
   return (
     <Suspense fallback={<p>Loading...</p>}>

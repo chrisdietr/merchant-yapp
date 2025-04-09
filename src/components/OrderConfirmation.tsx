@@ -50,16 +50,20 @@ const OrderConfirmation = () => {
     window.history.replaceState({}, document.title, url.toString());
   };
 
-  // More permissive postMessage listener that logs all messages
+  // More permissive postMessage listener that logs only relevant payment messages
   useEffect(() => {
     console.log("Setting up message listener for payment completion");
     
     const handleMessage = (event: MessageEvent) => {
-      // Log all incoming messages for debugging
-      console.log("Received message event:", event.origin, event.data);
-      
-      // Accept messages from any origin for maximum compatibility
-      if (event.data && typeof event.data === 'object') {
+      // Only process messages that might be payment-related
+      // Ignore wallet provider messages (MetaMask, Rabby, etc.)
+      if (event.data && typeof event.data === 'object' && 
+          !event.data.target && // Wallet messages typically have a target property
+          (event.data.type === 'payment_complete' || event.data.txHash)) {
+        
+        console.log("Received payment-related message:", event.origin, event.data);
+        
+        // Accept messages from any origin for maximum compatibility
         if (event.data.type === 'payment_complete' || 
             (event.data.txHash && (event.data.orderId || event.data.memo))) {
           console.log("Payment completion message detected:", event.data);
@@ -88,6 +92,60 @@ const OrderConfirmation = () => {
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, [orderId]);
+
+  // Iframe specific handler - detect when an iframe element becomes available and add listeners
+  useEffect(() => {
+    if (isInIframe || !orderId) return; // Only run in parent window and if we have an orderId
+    
+    // This function will look for and attach a load event to any Yodl iframe that appears in the DOM
+    const checkForYodlIframe = () => {
+      const iframes = document.querySelectorAll('iframe');
+      
+      iframes.forEach(iframe => {
+        if (iframe.src && iframe.src.includes('yodl.me')) {
+          console.log("Found Yodl iframe, attaching load listener:", iframe.src);
+          
+          // Only attach load event if not already attached
+          if (!iframe.dataset.listenerAttached) {
+            iframe.dataset.listenerAttached = 'true';
+            
+            iframe.addEventListener('load', () => {
+              console.log("Yodl iframe loaded, sending message listener to content window");
+              
+              // Try to attach a message listener to detect when "Done" is clicked
+              try {
+                // Send a message to the iframe to signal that we want to listen for payment completion
+                iframe.contentWindow?.postMessage({
+                  type: 'parent_listening',
+                  orderId: orderId
+                }, '*');
+              } catch (e) {
+                console.error("Error communicating with Yodl iframe:", e);
+              }
+            });
+          }
+        }
+      });
+    };
+    
+    // Set up a mutation observer to detect when iframes are added to the DOM
+    const observer = new MutationObserver((mutations) => {
+      checkForYodlIframe();
+    });
+    
+    // Start observing
+    observer.observe(document.body, { 
+      childList: true,
+      subtree: true 
+    });
+    
+    // Initial check for existing iframes
+    checkForYodlIframe();
+    
+    return () => {
+      observer.disconnect();
+    };
+  }, [isInIframe, orderId]);
 
   // Periodically check for payment completion in localStorage
   useEffect(() => {
@@ -371,7 +429,7 @@ const OrderConfirmation = () => {
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-2">
                 <p className="text-sm text-muted-foreground text-center px-2">Preview of the Yodl transaction page:</p>
-                <div className="w-full aspect-[1.91/3.12] lg:aspect-[1.91/2.88] border rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 relative"> 
+                <div className="w-full aspect-[1.91/3.12] lg:aspect-[1.91/2.88] border rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 relative iframe-container"> 
                   {/* Increased height by 20% from previous values */}
                   <div className="relative w-full h-full">
                     {/* Overlay with "Transaction Details" text */}
@@ -385,6 +443,7 @@ const OrderConfirmation = () => {
                       title="Yodl Transaction Preview"
                       className="w-full h-full border-0 relative z-0"
                       sandbox="allow-same-origin allow-scripts"
+                      style={{ pointerEvents: 'auto', touchAction: 'auto' }}
                     >
                       Loading preview...
                     </iframe>

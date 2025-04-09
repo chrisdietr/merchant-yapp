@@ -100,6 +100,33 @@ const Home = () => {
         }
       }
 
+      // Set a timeout to check for iframes and handle them if they're created
+      setTimeout(() => {
+        try {
+          // Find any new iframes created by Yodl
+          const iframes = document.querySelectorAll('iframe');
+          iframes.forEach(iframe => {
+            if (iframe.src && iframe.src.includes('yodl.me')) {
+              console.log("[handleBuyNow] Found Yodl iframe, ensuring it's usable on mobile/tablet:", iframe.src);
+              
+              // Add necessary styles for mobile/tablet
+              iframe.style.pointerEvents = 'auto';
+              iframe.style.touchAction = 'auto';
+              iframe.style.zIndex = '10';
+              
+              // Ensure parent container has proper scrolling
+              const parent = iframe.parentElement;
+              if (parent) {
+                parent.setAttribute('style', '-webkit-overflow-scrolling: touch; overflow: auto;');
+                parent.classList.add('iframe-container');
+              }
+            }
+          });
+        } catch (e) {
+          console.error("[handleBuyNow] Error handling iframes:", e);
+        }
+      }, 1000); // 1 second delay to allow iframe creation
+
       const paymentResult = await createPayment({
         amount: product.price,
         currency: product.currency,
