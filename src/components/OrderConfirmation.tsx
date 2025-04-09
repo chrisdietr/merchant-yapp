@@ -210,9 +210,9 @@ const OrderConfirmation = () => {
             <div className="space-y-4">
               <div className="bg-muted p-4 rounded-lg">
                 <h3 className="font-semibold text-center mb-2">Order Summary</h3>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <span className="text-muted-foreground">Order ID:</span>
-                  <span className="text-right">{orderId || "N/A"}</span>
+                  <span className="text-right break-all overflow-hidden overflow-ellipsis">{orderId || "N/A"}</span>
                   
                   {orderDetails && (
                     <>
