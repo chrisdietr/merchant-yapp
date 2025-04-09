@@ -166,15 +166,17 @@ const CheckoutModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md w-[90%] bg-background rounded-lg">
+      <DialogContent className={`${isInIframe ? 'sm:max-w-sm' : 'sm:max-w-md'} w-[90%] bg-background rounded-lg`}>
         <DialogHeader>
-          <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+          <DialogTitle className={`${isInIframe ? 'text-xl' : 'text-2xl'} font-bold flex items-center gap-2`}>
             <span>{product?.emoji}</span>
             <span>Checkout</span>
           </DialogTitle>
-          <DialogDescription>
-            Complete your purchase using cryptocurrency via Yodl.
-          </DialogDescription>
+          {!isInIframe && (
+            <DialogDescription>
+              Complete your purchase using cryptocurrency via Yodl.
+            </DialogDescription>
+          )}
         </DialogHeader>
 
         <div className="mt-4">

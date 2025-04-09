@@ -165,9 +165,11 @@ const OrderConfirmation = () => {
 
   return (
     <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-purple-900 dark:via-indigo-900 dark:to-purple-800">
-      <header className="sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Order Confirmation</h1>
+      <header className={`sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50 ${isInIframe ? 'py-2' : 'py-4'}`}>
+        <div className="container mx-auto px-4 flex justify-between items-center">
+          {!isInIframe && (
+            <h1 className="text-2xl font-bold">Order Confirmation</h1>
+          )}
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Button variant="outline" size="sm" asChild>

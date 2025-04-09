@@ -3,7 +3,7 @@ import { useRoutes, Routes, Route } from "react-router-dom";
 import { RainbowKitProvider, getDefaultWallets } from '@rainbow-me/rainbowkit';
 import { createConfig, http, WagmiConfig } from 'wagmi';
 import { mainnet, polygon, optimism, arbitrum, base, gnosis } from 'wagmi/chains';
-import { YodlProvider } from './contexts/YodlContext';
+import { YodlProvider, useYodl } from './contexts/YodlContext';
 import Home from "./components/home";
 import OrderConfirmation from "./components/OrderConfirmation";
 import routes from "tempo-routes";
@@ -32,6 +32,23 @@ const wagmiConfig = createConfig({
 
 const queryClient = new QueryClient();
 
+// Wrapper for the application content with iframe detection
+function AppContent() {
+  const { isInIframe } = useYodl();
+  
+  return (
+    <Suspense fallback={<p>Loading...</p>}>
+      <div className={`bg-background text-foreground min-h-screen ${isInIframe ? 'iframe-mode' : ''}`}>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/confirmation" element={<OrderConfirmation />} />
+        </Routes>
+        {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
+      </div>
+    </Suspense>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider>
@@ -39,15 +56,7 @@ function App() {
         <WagmiConfig config={wagmiConfig}>
           <RainbowKitProvider>
             <YodlProvider>
-              <Suspense fallback={<p>Loading...</p>}>
-                <div className="bg-background text-foreground min-h-screen">
-                  <Routes>
-                    <Route path="/" element={<Home />} />
-                    <Route path="/confirmation" element={<OrderConfirmation />} />
-                  </Routes>
-                  {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
-                </div>
-              </Suspense>
+              <AppContent />
             </YodlProvider>
           </RainbowKitProvider>
         </WagmiConfig>

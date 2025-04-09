@@ -39,7 +39,7 @@ const Home = () => {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { openConnectModal } = useConnectModal();
-  const { createPayment } = useYodl();
+  const { createPayment, isInIframe } = useYodl();
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
 
   const handleBuyNow = async (product: Product) => {
@@ -119,14 +119,16 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-purple-900 dark:via-indigo-900 dark:to-purple-800">
-      <header className="sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50">
-        <div className="container mx-auto px-4 py-3 flex flex-wrap justify-between items-center sm:flex-nowrap">
-          {/* Title Wrapper: Full width, centered text on mobile */}
-          <div className="w-full text-center order-1 sm:w-auto sm:text-left sm:order-none">
-            <h1 className="text-xl sm:text-2xl font-bold truncate inline-block">{shop.name}</h1> 
-          </div>
-          {/* Button Group Wrapper: Full width, right-aligned on mobile */}
-          <div className="w-full flex justify-end order-2 sm:w-auto sm:order-none">
+      <header className={`sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50 ${isInIframe ? 'py-2' : 'py-3'}`}>
+        <div className="container mx-auto px-4 flex flex-wrap justify-between items-center sm:flex-nowrap">
+          {/* Title Wrapper: Hide in iframe mode */}
+          {!isInIframe && (
+            <div className="w-full text-center order-1 sm:w-auto sm:text-left sm:order-none">
+              <h1 className="text-xl sm:text-2xl font-bold truncate inline-block">{shop.name}</h1> 
+            </div>
+          )}
+          {/* Button Group Wrapper: Full width in iframe mode */}
+          <div className={`${isInIframe ? 'w-full' : 'w-full sm:w-auto'} flex justify-end order-2 sm:order-none`}>
             <div className="flex items-center gap-2 sm:gap-4">
               <ThemeToggle />
               <ConnectButton 
