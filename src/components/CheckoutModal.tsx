@@ -96,6 +96,7 @@ const CheckoutModal = ({
         amount: product.price,
         currency: product.currency,
         description: product.name,
+        orderId: orderId,
         metadata: {
           productId: product.id,
           productName: product.name,

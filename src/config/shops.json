@@ -22,7 +22,7 @@
       "price": 0.05,
       "currency": "BRL",
       "emoji": "🧢",
-      "inStock": "true"
+      "inStock": true
     },
     {
       "id": "3",
@@ -31,7 +31,7 @@
       "price": 0.69,
       "currency": "THB",
       "emoji": "🍺",
-      "inStock": "true"
+      "inStock": "infinite"
     }
   ]
 } 

@@ -39,7 +39,7 @@ yarn install
 
 3. Configure your environment:
    - Copy `.env.example` to `.env`
-   - Add your WalletConnect Project ID and Alchemy API key
+   - Add your WalletConnect Project ID from [WalletConnect Cloud](https://cloud.walletconnect.com/)
 
 4. Start the development server:
 ```bash
