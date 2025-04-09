@@ -31,5 +31,12 @@ export default defineConfig({
   server: {
     // @ts-ignore
     allowedHosts: true,
+  },
+  // Adding build configuration for production
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    // Ensure paths are relative for Vercel deployment
+    emptyOutDir: true,
   }
 });

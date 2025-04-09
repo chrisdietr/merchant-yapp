@@ -16,6 +16,7 @@ import { format } from 'date-fns';
 import { QRCodeCanvas } from 'qrcode.react';
 import shopConfig from "../config/shops.json";
 import ThemeToggle from "./ThemeToggle";
+import { generateConfirmationUrl } from "@/utils/url";
 
 interface PaymentResult {
   txHash?: string | null; 
@@ -146,7 +147,7 @@ const OrderConfirmation = () => {
 
   const isSuccess = paymentResult && paymentResult.txHash;
   const receiptData = JSON.stringify({ orderId, paymentResult, orderDetails });
-  const confirmationUrl = `${window.location.origin}/confirmation?orderId=${orderId}`;
+  const confirmationUrl = generateConfirmationUrl(orderId || "");
   const receiptQrValue = confirmationUrl;
   const yodlTxUrl = isSuccess ? `https://yodl.me/tx/${paymentResult.txHash}` : '';
 

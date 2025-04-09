@@ -22,6 +22,7 @@ import {
 import { useYodl } from '../contexts/YodlContext';
 import { QRCodeCanvas } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
+import { generateConfirmationUrl } from "@/utils/url";
 
 interface Product {
   id: string;
@@ -93,7 +94,7 @@ const CheckoutModal = ({
 
     try {
       // Generate a confirmation page URL
-      const confirmationUrl = `${window.location.origin}/confirmation?orderId=${orderId}`;
+      const confirmationUrl = generateConfirmationUrl(orderId);
       
       console.log(`Starting payment${isInIframe ? ' (in iframe mode)' : ''}`);
       
@@ -155,7 +156,7 @@ const CheckoutModal = ({
   const getPaymentLink = () => {
     if (!product) return '';
     const identifier = merchantEns || merchantAddress;
-    const confirmationUrl = encodeURIComponent(`${window.location.origin}/confirmation?orderId=${orderId}`);
+    const confirmationUrl = encodeURIComponent(generateConfirmationUrl(orderId));
     return `https://yodl.me/${identifier}?amount=${product.price}&currency=${product.currency}&redirectUrl=${confirmationUrl}`;
   };
 

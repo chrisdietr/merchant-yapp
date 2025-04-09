@@ -15,6 +15,7 @@ import { Wallet } from "lucide-react";
 import ProductCard from "./ProductCard";
 import shopConfig from "../config/shops.json";
 import ThemeToggle from './ThemeToggle';
+import { generateConfirmationUrl } from "@/utils/url";
 
 interface Product {
   id: string;
@@ -53,7 +54,7 @@ const Home = () => {
 
     const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     console.log(`[handleBuyNow] Generated orderId: ${orderId}`);
-    const confirmationUrl = `${window.location.origin}/confirmation?orderId=${orderId}`;
+    const confirmationUrl = generateConfirmationUrl(orderId);
     
     try {
       console.log("[handleBuyNow] Attempting to save to localStorage...");
