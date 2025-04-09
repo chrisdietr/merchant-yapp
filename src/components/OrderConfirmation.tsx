@@ -16,7 +16,7 @@ import { format } from 'date-fns';
 import { QRCodeCanvas } from 'qrcode.react';
 import shopConfig from "../config/shops.json";
 import ThemeToggle from "./ThemeToggle";
-import { generateConfirmationUrl } from "@/utils/url";
+import { generateConfirmationUrl, getBaseUrl } from "@/utils/url";
 
 interface PaymentResult {
   txHash?: string | null; 
@@ -222,8 +222,12 @@ const OrderConfirmation = () => {
   // Render Confirmation Content
   const isSuccess = paymentResult && paymentResult.txHash;
   const receiptData = JSON.stringify({ orderId, paymentResult, orderDetails });
-  const confirmationPageUrl = generateConfirmationUrl(orderId || "");
+  
+  // Generate and Log the QR Code URL
+  const confirmationPageUrl = orderId ? generateConfirmationUrl(orderId) : '';
+  console.log(`OrderConfirmation: Generating QR Code with URL: ${confirmationPageUrl}`); // Log the URL
   const receiptQrValue = confirmationPageUrl;
+  
   const yodlTxUrl = isSuccess ? `https://yodl.me/tx/${paymentResult.txHash}` : '';
 
   // Construct pre-filled Telegram message
@@ -271,9 +275,9 @@ const OrderConfirmation = () => {
                 <CardDescription className="text-center">
                   Your order has been confirmed and is being processed.
                 </CardDescription>
-                {isSuccess && (
-                  <div className="mt-4 flex justify-center">
-                    <div className="p-2 bg-white rounded-lg">
+                <div className="mt-4 flex justify-center">
+                  <div className="p-2 bg-white rounded-lg">
+                    {receiptQrValue ? (
                       <QRCodeCanvas 
                         value={receiptQrValue}
                         size={180} 
@@ -282,9 +286,11 @@ const OrderConfirmation = () => {
                         bgColor="#ffffff"
                         fgColor="#000000"
                       />
-                    </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground p-4">QR code requires a valid Order ID.</p>
+                    )}
                   </div>
-                )}
+                </div>
               </>
             ) : (
               <CardTitle className="text-2xl text-center">Order Status</CardTitle>
@@ -345,7 +351,8 @@ const OrderConfirmation = () => {
               ) : (
                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
                     <p className="text-center text-yellow-800">
-                      Waiting for payment confirmation or payment details not found.
+                      Payment status cannot be verified on this device.
+                      Please check the device used for payment or contact support if issues persist.
                     </p>
                   </div>
               )}
