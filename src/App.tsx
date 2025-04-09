@@ -37,82 +37,39 @@ const queryClient = new QueryClient();
 function AppContent() {
   const { isInIframe } = useYodl();
   
-  // Add CSS fixes for mobile/tablet devices
+  // Add basic CSS fixes for mobile/tablet devices
   useEffect(() => {
-    // Detect if we're on a mobile device
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
     // Add a style tag to ensure iframes are clickable on mobile/tablet
     const style = document.createElement('style');
     style.textContent = `
-      /* Ensure iframes are properly accessible on mobile/tablet */
+      /* Ensure iframes are generally accessible */
       iframe {
         pointer-events: auto !important;
         touch-action: auto !important;
-        z-index: 10 !important;
+        z-index: 10 !important; /* Keep a reasonable z-index */
       }
       
-      /* Fix for iOS iframe scrolling */
+      /* Basic iOS iframe scrolling */
       .iframe-container {
         -webkit-overflow-scrolling: touch;
         overflow: auto;
       }
       
-      /* Fix for certain Yodl iframe issues */
+      /* Basic Yodl iframe styling */
       iframe[src*="yodl.me"] {
-        position: ${isMobile ? 'fixed' : 'relative'} !important;
-        ${isMobile ? 'top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important;' : ''}
-        min-height: 500px;
+        position: relative !important; /* Default to relative */
+        min-height: 500px; /* Ensure minimum height */
         background-color: white !important;
       }
-      
-      /* Mobile-specific fullscreen overlay to prevent background content from showing */
-      ${isMobile ? `
-      .yodl-iframe-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 9;
-        background-color: white;
-        display: none;
-      }
-      
-      .yodl-iframe-overlay.visible {
-        display: block;
-      }
-      ` : ''}
     `;
     document.head.appendChild(style);
     
-    // Add a fullscreen overlay element for mobile Yodl iframe
-    if (isMobile) {
-      const overlay = document.createElement('div');
-      overlay.className = 'yodl-iframe-overlay';
-      document.body.appendChild(overlay);
-      
-      // Monitor for Yodl iframes and show the overlay when they appear
-      const observer = new MutationObserver((mutations) => {
-        const yodlIframes = document.querySelectorAll('iframe[src*="yodl.me"]');
-        if (yodlIframes.length > 0) {
-          overlay.classList.add('visible');
-        } else {
-          overlay.classList.remove('visible');
-        }
-      });
-      
-      observer.observe(document.body, { childList: true, subtree: true });
-    }
+    // REMOVED overlay logic and dynamic mobile styling
     
     return () => {
       document.head.removeChild(style);
-      const overlay = document.querySelector('.yodl-iframe-overlay');
-      if (overlay) {
-        document.body.removeChild(overlay);
-      }
     };
-  }, [isInIframe]);
+  }, []); // Run only once on mount
   
   return (
     <Suspense fallback={<p>Loading...</p>}>

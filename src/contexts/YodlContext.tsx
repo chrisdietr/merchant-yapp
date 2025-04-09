@@ -209,8 +209,8 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         }
       }
       
-      // Ensure redirect URL is absolute, especially important for mobile
-      if (!redirectUrl.startsWith('http')) {
+      // For mobile devices, ensure the redirect URL uses the full origin to avoid iframe issues
+      if (isMobile && !redirectUrl.startsWith('http')) {
         redirectUrl = new URL(redirectUrl, window.location.origin).toString();
       }
       
@@ -236,50 +236,8 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         };
         localStorage.setItem(`order_${orderId}`, JSON.stringify(orderData));
         console.log(`Saved order data for ${orderId} before payment request`);
-        
-        // For mobile, also add to mobile_orders collection
-        if (isMobile) {
-          try {
-            const mobileOrders = JSON.parse(localStorage.getItem('mobile_orders') || '{}');
-            mobileOrders[orderId] = {
-              ...orderData,
-              createdAt: Date.now()
-            };
-            localStorage.setItem('mobile_orders', JSON.stringify(mobileOrders));
-          } catch (e) {
-            console.warn('Error saving to mobile_orders:', e);
-          }
-        }
       } catch (e) {
         console.warn('Could not save order data to localStorage', e);
-      }
-      
-      // For mobile, handle direct navigation approach
-      if (isMobile) {
-        try {
-          // Create direct URL to Yodl
-          const yodlDirectUrl = `https://yodl.me/checkout?recipient=${encodeURIComponent(recipientIdentifier)}&amount=${params.amount}&currency=${params.currency}&memo=${params.orderId}&redirectUrl=${encodeURIComponent(redirectUrl)}`;
-
-          // For direct mobile navigation, we create a dummy result that will be updated by the redirect
-          localStorage.setItem(`payment_${params.orderId}`, JSON.stringify({
-            txHash: null,
-            chainId: null,
-            pendingMobile: true,
-            timestamp: new Date().toISOString()
-          }));
-          
-          // Return a fake result that indicates mobile navigation is taking place
-          return {
-            redirect: true,
-            mobileRedirect: true,
-            url: yodlDirectUrl,
-            orderId: params.orderId,
-            memo: params.orderId
-          };
-        } catch (e) {
-          console.error('Error preparing mobile redirect:', e);
-          // Fall through to the standard approach
-        }
       }
       
       // Request payment - this will open Yodl UI
@@ -320,14 +278,6 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
           }
         } catch (e) {
           console.error("Error broadcasting direct payment completion:", e);
-        }
-        
-        // For mobile devices, force navigate to the confirmation page
-        if (isMobile) {
-          console.log("Mobile device detected with payment success, forcing navigation");
-          setTimeout(() => {
-            window.location.href = redirectUrl;
-          }, 100);
         }
       }
 

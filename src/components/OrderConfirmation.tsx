@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Download, Home, Loader2, ExternalLink, Send } from "lucide-react";
+import { CheckCircle, Download, Home, Loader2, ExternalLink, Send, XCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -37,12 +37,8 @@ const OrderConfirmation = () => {
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showQrCode, setShowQrCode] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const orderId = searchParams.get("orderId");
-  // Also check for txHash directly from URL parameters (for when Yodl redirects back)
-  const txHash = searchParams.get("txHash");
-  const chainId = searchParams.get("chainId") ? parseInt(searchParams.get("chainId") || "0") : undefined;
-  
   const shop = shopConfig.shops[0];
   const shopTelegramHandle = shop?.telegramHandle;
   
@@ -57,345 +53,177 @@ const OrderConfirmation = () => {
     window.history.replaceState({}, document.title, url.toString());
   };
 
-  // Immediate check for URL parameters on first render
+  // Primary Effect: Detect Payment Completion and Load Data
   useEffect(() => {
-    // If we have txHash directly in URL parameters, use it immediately
-    if (txHash && orderId) {
-      console.log("Found txHash directly in URL parameters:", txHash);
-      
-      const result = { txHash, chainId };
-      setPaymentResult(result);
-      
-      // Store it for future use
-      localStorage.setItem(`payment_${orderId}`, JSON.stringify(result));
-      
-      // Load order details
+    if (!orderId) {
+      setError("Order ID is missing.");
+      setIsLoading(false);
+      return;
+    }
+
+    console.log(`Order Confirmation: Starting check for orderId: ${orderId}`);
+    setIsLoading(true); // Start in loading state
+    setError(null);
+    setPaymentResult(null);
+    setOrderDetails(null);
+
+    const checkPaymentStatus = () => {
+      let foundPaymentResult: PaymentResult | null = null;
+
+      // 1. Check URL parameters (for direct redirect)
       try {
-        // Look for order details in localStorage using the orderId both with and without prefix
-        const storedDetails = localStorage.getItem(`order_${orderId}`) || localStorage.getItem(orderId);
-        
+        const urlResult = parsePaymentFromUrl();
+        if (urlResult && urlResult.txHash && (urlResult.memo === orderId || !urlResult.memo)) {
+          console.log("Found payment result in URL params:", urlResult);
+          foundPaymentResult = { txHash: urlResult.txHash, chainId: urlResult.chainId };
+          cleanPaymentUrl(); // Clean URL after processing
+        }
+      } catch (e) {
+        console.warn("Error parsing URL for payment:", e);
+      }
+
+      // 2. Check localStorage (most reliable method)
+      if (!foundPaymentResult) {
+        try {
+          const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
+          if (storedPaymentResult) {
+            const parsedResult = JSON.parse(storedPaymentResult);
+            if (parsedResult.txHash) {
+              console.log("Found payment result in localStorage:", parsedResult);
+              foundPaymentResult = parsedResult;
+            }
+          }
+        } catch (e) {
+          console.warn("Error parsing localStorage for payment:", e);
+        }
+      }
+      
+      return foundPaymentResult;
+    };
+
+    const loadOrderDetails = () => {
+      try {
+        const storedDetails = localStorage.getItem(orderId) || localStorage.getItem(`order_${orderId}`);
         if (storedDetails) {
           const parsedDetails = JSON.parse(storedDetails);
-          console.log("Found order details for txHash in URL:", parsedDetails);
-          setOrderDetails({
-            ...parsedDetails,
-            timestamp: parsedDetails.timestamp || format(new Date(), 'PPP p')
-          } as OrderDetails);
+          // Ensure timestamp exists, format if necessary
+          if (!parsedDetails.timestamp) {
+             parsedDetails.timestamp = format(new Date(), 'PPP p');
+          } else {
+             // Check if timestamp is ISO string, format if needed
+             try {
+               parsedDetails.timestamp = format(new Date(parsedDetails.timestamp), 'PPP p');
+             } catch {}
+          }
+          setOrderDetails(parsedDetails as OrderDetails);
+          console.log("Loaded order details:", parsedDetails);
         } else {
-          // For mobile, check the mobile_orders tracker
-          try {
-            const mobileOrders = JSON.parse(localStorage.getItem('mobile_orders') || '{}');
-            if (mobileOrders[orderId]) {
-              console.log("Found order in mobile_orders tracker:", mobileOrders[orderId]);
-              setOrderDetails({
-                ...mobileOrders[orderId],
-                timestamp: mobileOrders[orderId].timestamp || format(new Date(), 'PPP p')
-              } as OrderDetails);
-            }
-          } catch (e) {
-            console.error("Error checking mobile_orders:", e);
-          }
+          console.warn("Could not find order details in localStorage for", orderId);
+          // Optionally set an error or default details
         }
       } catch (e) {
-        console.error("Error loading order details for URL txHash:", e);
+        console.error("Error loading order details:", e);
+        setError("Failed to load order details.");
       }
-      
-      // Clean URL
-      cleanPaymentUrl();
-      
-      // Stop loading
-      setIsLoading(false);
-    }
-  }, [txHash, chainId, orderId]);
+    };
 
-  // Special handling for mobile - check payment status more aggressively
-  useEffect(() => {
-    if (!orderId || !isMobile) return;
-    
-    console.log("Mobile device detected - setting up aggressive payment checks");
-    
-    // On mobile, check payment status every second for 30 seconds
-    const mobileIntervalId = setInterval(() => {
-      try {
-        const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
-        
-        if (storedPaymentResult) {
-          const parsedResult = JSON.parse(storedPaymentResult);
-          
-          if (parsedResult.txHash) {
-            console.log("Mobile check found payment result:", parsedResult);
-            setPaymentResult(parsedResult);
-            setIsLoading(false);
-            clearInterval(mobileIntervalId);
-            
-            // Also load order details
-            const storedDetails = localStorage.getItem(`order_${orderId}`) || localStorage.getItem(orderId);
-            if (storedDetails) {
-              try {
-                const parsedDetails = JSON.parse(storedDetails);
-                setOrderDetails(parsedDetails as OrderDetails);
-              } catch (e) {
-                console.error("Error parsing stored order details:", e);
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error("Error in mobile payment check:", e);
-      }
-    }, 1000);
-    
-    // Clear the interval after 30 seconds
-    setTimeout(() => {
-      clearInterval(mobileIntervalId);
-      
-      // If still loading, show content anyway to prevent blank screen
-      if (isLoading) {
-        console.log("Mobile timeout reached - showing content anyway");
+    // Polling mechanism
+    let attempts = 0;
+    const maxAttempts = 60; // Poll for 60 seconds (60 * 1000ms)
+    const intervalMs = 1000;
+
+    const intervalId = setInterval(() => {
+      console.log(`Payment check attempt ${attempts + 1}/${maxAttempts}`);
+      const result = checkPaymentStatus();
+
+      if (result) {
+        console.log("Payment confirmed!");
+        clearInterval(intervalId);
+        setPaymentResult(result);
+        loadOrderDetails();
         setIsLoading(false);
-      }
-    }, 30000);
-    
-    return () => clearInterval(mobileIntervalId);
-  }, [orderId, isMobile, isLoading]);
-
-  // More permissive postMessage listener that logs only relevant payment messages
-  useEffect(() => {
-    console.log("Setting up message listener for payment completion");
-    
-    const handleMessage = (event: MessageEvent) => {
-      // Only process messages that might be payment-related
-      // Ignore wallet provider messages (MetaMask, Rabby, etc.)
-      if (event.data && typeof event.data === 'object' && 
-          !event.data.target && // Wallet messages typically have a target property
-          (event.data.type === 'payment_complete' || event.data.txHash)) {
-        
-        console.log("Received payment-related message:", event.origin, event.data);
-        
-        // Accept messages from any origin for maximum compatibility
-        if (event.data.type === 'payment_complete' || 
-            (event.data.txHash && (event.data.orderId || event.data.memo))) {
-          console.log("Payment completion message detected:", event.data);
-          
-          // Extract data regardless of format
-          const txHash = event.data.txHash;
-          const chainId = event.data.chainId;
-          const messageOrderId = event.data.orderId || event.data.memo;
-          
-          // If we have transaction data and it matches our order (or we don't have an orderId to match)
-          if (txHash && (!orderId || messageOrderId === orderId || !messageOrderId)) {
-            console.log("Setting payment result from message:", { txHash, chainId });
-            setPaymentResult({ txHash, chainId });
-            
-            // Store in localStorage for persistence
-            if (orderId) {
-              localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
-            }
-            
-            setIsLoading(false);
-          }
+        // Ensure payment is stored for future reference
+        localStorage.setItem(`payment_${orderId}`, JSON.stringify(result)); 
+      } else {
+        attempts++;
+        if (attempts >= maxAttempts) {
+          console.log("Max payment check attempts reached.");
+          clearInterval(intervalId);
+          // Even if payment isn't confirmed, try loading order details
+          loadOrderDetails(); 
+          setIsLoading(false);
+          // Optionally set an error if payment is expected but not found
+          // setError("Payment confirmation timed out.");
         }
       }
-    };
+    }, intervalMs);
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [orderId]);
-
-  // Iframe specific handler - detect when an iframe element becomes available and add listeners
-  useEffect(() => {
-    if (isInIframe || !orderId) return; // Only run in parent window and if we have an orderId
-    
-    // This function will look for and attach a load event to any Yodl iframe that appears in the DOM
-    const checkForYodlIframe = () => {
-      const iframes = document.querySelectorAll('iframe');
-      
-      iframes.forEach(iframe => {
-        if (iframe.src && iframe.src.includes('yodl.me')) {
-          console.log("Found Yodl iframe, attaching load listener:", iframe.src);
-          
-          // Only attach load event if not already attached
-          if (!iframe.dataset.listenerAttached) {
-            iframe.dataset.listenerAttached = 'true';
-            
-            iframe.addEventListener('load', () => {
-              console.log("Yodl iframe loaded, sending message listener to content window");
-              
-              // Try to attach a message listener to detect when "Done" is clicked
-              try {
-                // Send a message to the iframe to signal that we want to listen for payment completion
-                iframe.contentWindow?.postMessage({
-                  type: 'parent_listening',
-                  orderId: orderId
-                }, '*');
-              } catch (e) {
-                console.error("Error communicating with Yodl iframe:", e);
-              }
-            });
-          }
-        }
-      });
-    };
-    
-    // Set up a mutation observer to detect when iframes are added to the DOM
-    const observer = new MutationObserver((mutations) => {
-      checkForYodlIframe();
-    });
-    
-    // Start observing
-    observer.observe(document.body, { 
-      childList: true,
-      subtree: true 
-    });
-    
-    // Initial check for existing iframes
-    checkForYodlIframe();
-    
-    return () => {
-      observer.disconnect();
-    };
-  }, [isInIframe, orderId]);
-
-  // Periodically check for payment completion in localStorage
-  useEffect(() => {
-    if (!orderId || paymentResult) return; // Skip if no orderId or already have result
-    
-    console.log("Setting up periodic check for payment result");
-    
-    const checkInterval = setInterval(() => {
-      try {
-        const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
-        if (storedPaymentResult) {
-          const parsedResult = JSON.parse(storedPaymentResult);
-          if (parsedResult.txHash) {
-            console.log("Found payment result in localStorage during periodic check:", parsedResult);
-            setPaymentResult(parsedResult);
-            setIsLoading(false);
-            clearInterval(checkInterval);
-          }
-        }
-      } catch (e) {
-        console.error("Error checking for payment result:", e);
-      }
-    }, 1000); // Check every second
-    
-    return () => clearInterval(checkInterval);
-  }, [orderId, paymentResult]);
-
-  // Main data loading effect 
-  useEffect(() => {
-    // Skip if we already have the payment result from URL params
-    if (paymentResult) return;
-    
-    console.log("Confirmation Page - Raw URL Search Params:", window.location.search);
-    
-    // Try to parse payment information from URL (for redirect flow)
-    const result = parsePaymentFromUrl();
-    console.log("Confirmation Page - Parsed URL Result:", JSON.stringify(result));
-
-    let loadedOrderDetails: Partial<OrderDetails> | null = null;
-    let loadedPaymentResult: PaymentResult | null = null;
-    
-    if (orderId) {
-      try {
-        // Look for order details in both potential localStorage locations
-        const storedDetails = localStorage.getItem(`order_${orderId}`) || localStorage.getItem(orderId);
-        const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
-        
-        if (!storedDetails) {
-          // For mobile, check mobile_orders as a fallback
-          try {
-            const mobileOrders = JSON.parse(localStorage.getItem('mobile_orders') || '{}');
-            if (mobileOrders[orderId]) {
-              loadedOrderDetails = mobileOrders[orderId];
-              console.log("Loaded order details from mobile_orders:", loadedOrderDetails);
-            }
-          } catch (e) {
-            console.error("Error checking mobile_orders:", e);
-          }
-        } else {
-          loadedOrderDetails = JSON.parse(storedDetails);
-          console.log("Confirmation Page - Loaded Stored Order Details:", loadedOrderDetails);
-        }
-        
-        if (storedPaymentResult) {
-          loadedPaymentResult = JSON.parse(storedPaymentResult);
-          console.log("Confirmation Page - Loaded Stored Payment Result:", loadedPaymentResult);
-        }
-      } catch (e) {
-        console.error("Failed to load data from localStorage", e);
-      }
-    }
-
-    // Check specifically for txHash presence in URL first, then fallback to stored result
-    if (result && result.txHash) {
-      console.log(`Confirmation Page - Found txHash: ${result.txHash}, chainId: ${result.chainId}`);
-      setPaymentResult(result);
-      
-      // Store payment result in localStorage
-      if (orderId) {
-        localStorage.setItem(`payment_${orderId}`, JSON.stringify(result));
-      }
-      
-      cleanPaymentUrl(); // Clean URL only after confirming txHash
-      setOrderDetails({
-        ...(loadedOrderDetails || {}),
-        timestamp: format(new Date(), 'PPP p'),
-      } as OrderDetails);
-      
-      // Make sure to store order details with the updated timestamp
-      if (orderId && loadedOrderDetails) {
-        localStorage.setItem(`order_${orderId}`, JSON.stringify({
-          ...(loadedOrderDetails || {}),
-          timestamp: format(new Date(), 'PPP p'),
-        }));
-      }
-    } else if (loadedPaymentResult && loadedPaymentResult.txHash) {
-      // Fallback to stored payment result if URL doesn't have transaction data
-      console.log("Confirmation Page - Using stored payment result:", loadedPaymentResult);
-      setPaymentResult(loadedPaymentResult);
-      
-      if (loadedOrderDetails) {
-        setOrderDetails(loadedOrderDetails as OrderDetails);
-      }
+    // Immediate check
+    const initialResult = checkPaymentStatus();
+    if (initialResult) {
+      console.log("Payment confirmed immediately!");
+      clearInterval(intervalId);
+      setPaymentResult(initialResult);
+      loadOrderDetails();
+      setIsLoading(false);
+      localStorage.setItem(`payment_${orderId}`, JSON.stringify(initialResult));
     } else {
-      console.log("Confirmation Page - No valid txHash found in URL parameters or storage.");
-      // Load stored order details even if payment confirmation fails or isn't present
-      if (loadedOrderDetails) {
-         setOrderDetails({
-           ...(loadedOrderDetails || {}),
-           timestamp: loadedOrderDetails.timestamp || format(new Date(), 'PPP p'),
-         } as OrderDetails);
-      }
+      // Load order details immediately even if payment pending
+      loadOrderDetails();
+      // Don't stop loading until payment confirmed or timeout
     }
-    setIsLoading(false);
-  }, [parsePaymentFromUrl, orderId, paymentResult]);
+
+    return () => clearInterval(intervalId);
+
+  }, [orderId, parsePaymentFromUrl]); // Only run when orderId changes
 
   // Document title effect
   useEffect(() => {
     if (orderDetails) {
       document.title = `Order Confirmation - ${orderDetails.name}`;
+    } else if (orderId) {
+      document.title = `Order Status - ${orderId}`;
     } else {
-      document.title = "Order Confirmation";
+      document.title = "Order Status";
     }
     
     return () => {
       document.title = "Merchant Yapp";
     };
-  }, [orderDetails]);
+  }, [orderDetails, orderId]);
 
+  // Render Loading State
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-16 w-16 animate-spin text-primary" />
+        <p className="ml-4">Checking payment status...</p>
       </div>
     );
   }
 
+  // Render Error State
+  if (error) {
+    return (
+       <div className="min-h-screen bg-background flex flex-col items-center justify-center text-center px-4">
+         <XCircle className="h-16 w-16 text-destructive mb-4" />
+         <h2 className="text-2xl font-bold mb-2">Error</h2>
+         <p className="text-destructive mb-6">{error}</p>
+         <Button asChild variant="outline">
+           <Link to="/">
+             <Home className="mr-2 h-4 w-4" />
+             Return to Home
+           </Link>
+         </Button>
+       </div>
+    );
+  }
+
+  // Render Confirmation Content
   const isSuccess = paymentResult && paymentResult.txHash;
   const receiptData = JSON.stringify({ orderId, paymentResult, orderDetails });
-  const confirmationUrl = generateConfirmationUrl(orderId || "");
-  const receiptQrValue = confirmationUrl;
+  const confirmationPageUrl = generateConfirmationUrl(orderId || "");
+  const receiptQrValue = confirmationPageUrl;
   const yodlTxUrl = isSuccess ? `https://yodl.me/tx/${paymentResult.txHash}` : '';
 
   // Construct pre-filled Telegram message

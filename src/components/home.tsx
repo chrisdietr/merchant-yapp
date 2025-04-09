@@ -57,42 +57,17 @@ const Home = () => {
 
     const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
     console.log(`[handleBuyNow] Generated orderId: ${orderId}`);
-    
-    // For mobile devices, create a direct absolute URL with the origin
-    const confirmationUrl = isMobile 
-      ? `${window.location.origin}/confirmation?orderId=${orderId}`
-      : generateConfirmationUrl(orderId);
-    
-    console.log(`[handleBuyNow] Confirmation URL: ${confirmationUrl}`);
+    const confirmationUrl = generateConfirmationUrl(orderId);
     
     try {
       console.log("[handleBuyNow] Attempting to save to localStorage...");
-      // For mobile, store more data directly in localStorage to avoid relying on postMessage
-      const orderData = {
+      localStorage.setItem(orderId, JSON.stringify({
         name: product.name,
         price: product.price,
         currency: product.currency,
-        emoji: product.emoji,
-        timestamp: new Date().toISOString()
-      };
-      
-      localStorage.setItem(`order_${orderId}`, JSON.stringify(orderData));
+        emoji: product.emoji
+      }));
       console.log(`[handleBuyNow] Stored details successfully for order ${orderId}`);
-      
-      // For mobile devices, create a backup of the order data with a timestamp to track it
-      if (isMobile) {
-        try {
-          const mobileOrders = JSON.parse(localStorage.getItem('mobile_orders') || '{}');
-          mobileOrders[orderId] = {
-            ...orderData,
-            createdAt: Date.now()
-          };
-          localStorage.setItem('mobile_orders', JSON.stringify(mobileOrders));
-          console.log(`[handleBuyNow] Added order to mobile_orders tracking`);
-        } catch (e) {
-          console.error("[handleBuyNow] Failed to create mobile order backup:", e);
-        }
-      }
     } catch (e) {
       console.error("[handleBuyNow] Failed to save order details to localStorage", e);
       setIsProcessingPayment(null); // Reset loading state on error
@@ -109,58 +84,62 @@ const Home = () => {
         redirectUrl: confirmationUrl
       });
 
-      // For mobile devices, use a different approach
-      if (isMobile) {
-        console.log("[handleBuyNow] Mobile device detected, using mobile-specific flow");
-        
-        // Add the current window URL to sessionStorage for use after returning
-        sessionStorage.setItem('previous_url', window.location.href);
-        
-        // Directly open the Yodl payment page in the current window for mobile
-        // This is a critical change - we're removing the iframe approach on mobile
+      // In iframe mode, send a message to parent window about the order
+      if (isInIframe) {
         try {
-          const yodlDirectUrl = `https://yodl.me/checkout?recipient=${encodeURIComponent(
-            product.currency === 'USD' ? 'merchantyapp.eth' : 'merchantyapp.eth'
-          )}&amount=${product.price}&currency=${product.currency}&memo=${orderId}&redirectUrl=${encodeURIComponent(confirmationUrl)}`;
+          window.parent.postMessage({
+            type: 'order_started',
+            orderId: orderId,
+            product: {
+              name: product.name,
+              price: product.price,
+              currency: product.currency
+            }
+          }, '*');
           
-          console.log(`[handleBuyNow] Mobile direct payment URL: ${yodlDirectUrl}`);
-          
-          // Create a hidden form to post to Yodl (handles more reliably than direct navigation)
-          const form = document.createElement('form');
-          form.method = 'GET';
-          form.action = 'https://yodl.me/checkout';
-          form.style.display = 'none';
-          
-          const addField = (name: string, value: string) => {
-            const field = document.createElement('input');
-            field.type = 'hidden';
-            field.name = name;
-            field.value = value;
-            form.appendChild(field);
-          };
-          
-          addField('recipient', product.currency === 'USD' ? 'merchantyapp.eth' : 'merchantyapp.eth');
-          addField('amount', product.price.toString());
-          addField('currency', product.currency);
-          addField('memo', orderId);
-          addField('redirectUrl', confirmationUrl);
-          
-          document.body.appendChild(form);
-          form.submit();
-          
-          // Set a backup timeout to redirect if the form submit doesn't work
-          setTimeout(() => {
-            window.location.href = yodlDirectUrl;
-          }, 500);
-          
-          return; // Skip the rest of the flow for mobile
+          console.log("[handleBuyNow] Notified parent window about order start");
         } catch (e) {
-          console.error("[handleBuyNow] Error with direct mobile navigation:", e);
-          // Fall back to regular flow if this approach fails
+          console.error("[handleBuyNow] Error notifying parent window:", e);
         }
       }
 
-      // Continue with regular flow (will only reach here if mobile direct approach failed or on desktop)
+      // Set a timeout to check for iframes and handle them if they're created
+      setTimeout(() => {
+        try {
+          // Find any new iframes created by Yodl
+          const iframes = document.querySelectorAll('iframe');
+          iframes.forEach(iframe => {
+            if (iframe.src && iframe.src.includes('yodl.me')) {
+              console.log("[handleBuyNow] Found Yodl iframe, ensuring it's usable on mobile/tablet:", iframe.src);
+              
+              // Add necessary styles for mobile/tablet
+              iframe.style.pointerEvents = 'auto';
+              iframe.style.touchAction = 'auto';
+              iframe.style.zIndex = '10';
+              
+              // For mobile devices, make sure iframe is absolutely visible
+              if (isMobile) {
+                iframe.style.position = 'fixed';
+                iframe.style.top = '0';
+                iframe.style.left = '0';
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+                iframe.style.backgroundColor = '#ffffff';
+              }
+              
+              // Ensure parent container has proper scrolling
+              const parent = iframe.parentElement;
+              if (parent) {
+                parent.setAttribute('style', '-webkit-overflow-scrolling: touch; overflow: auto;');
+                parent.classList.add('iframe-container');
+              }
+            }
+          });
+        } catch (e) {
+          console.error("[handleBuyNow] Error handling iframes:", e);
+        }
+      }, 1000); // 1 second delay to allow iframe creation
+
       const paymentResult = await createPayment({
         amount: product.price,
         currency: product.currency,
@@ -171,7 +150,7 @@ const Home = () => {
           productName: product.name,
           emoji: product.emoji
         },
-        // Always use absolute URL for redirects
+        // Use consistent redirect URL
         redirectUrl: confirmationUrl
       });
       
@@ -187,45 +166,36 @@ const Home = () => {
           chainId: paymentResult.chainId
         }));
         
+        // In iframe mode, notify parent about completion
+        if (isInIframe) {
+          try {
+            window.parent.postMessage({
+              type: 'payment_complete',
+              txHash: paymentResult.txHash,
+              chainId: paymentResult.chainId,
+              orderId: orderId
+            }, '*');
+            console.log("[handleBuyNow] Notified parent window about payment completion");
+          } catch (e) {
+            console.error("[handleBuyNow] Error notifying parent window about completion:", e);
+          }
+        }
+
         // Navigate to confirmation page
+        console.log('[handleBuyNow] Navigating to confirmation URL:', confirmationUrl);
         window.location.href = confirmationUrl;
       } else {
         console.log('[handleBuyNow] No immediate payment result, awaiting redirect or confirmation...');
-        
-        // For mobile, set up a periodic check for payment completion
-        if (isMobile) {
-          console.log("[handleBuyNow] Setting up mobile payment check interval");
-          const intervalId = setInterval(() => {
-            try {
-              const storedPayment = localStorage.getItem(`payment_${orderId}`);
-              if (storedPayment) {
-                console.log("[handleBuyNow] Found payment in interval check, redirecting to confirmation");
-                clearInterval(intervalId);
-                window.location.href = confirmationUrl;
-              }
-            } catch (e) {
-              console.error("[handleBuyNow] Error in mobile payment check interval:", e);
-            }
-          }, 2000); // Check every 2 seconds
-          
-          // Store the interval ID in session storage for cleanup
-          sessionStorage.setItem('mobileCheckIntervalId', String(intervalId));
-          
-          // Also set a timeout to clear the interval after a reasonable time
-          setTimeout(() => {
-            clearInterval(intervalId);
-            sessionStorage.removeItem('mobileCheckIntervalId');
-          }, 120000); // Clear after 2 minutes
-        }
       }
     } catch (error) {
       console.error('[handleBuyNow] Call to createPayment failed:', error);
       // Handle errors (e.g., user cancellation, timeout)
-      if (error.message !== 'Payment was cancelled') {
+      if (error && typeof error === 'object' && 'message' in error && error.message !== 'Payment was cancelled') {
         alert(`Payment failed: ${error.message}`); // User feedback
       }
       // Clear stored data if payment failed early
-      localStorage.removeItem(orderId);
+      localStorage.removeItem(orderId); // Remove order details
+      localStorage.removeItem(`payment_${orderId}`); // Ensure payment details are cleared too
       setIsProcessingPayment(null); // Reset loading state on error
     }
   };
