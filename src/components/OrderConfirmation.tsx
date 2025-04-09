@@ -39,6 +39,10 @@ const OrderConfirmation = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showQrCode, setShowQrCode] = useState(false);
   const orderId = searchParams.get("orderId");
+  // Also check for txHash directly from URL parameters (for when Yodl redirects back)
+  const txHash = searchParams.get("txHash");
+  const chainId = searchParams.get("chainId") ? parseInt(searchParams.get("chainId") || "0") : undefined;
+  
   const shop = shopConfig.shops[0];
   const shopTelegramHandle = shop?.telegramHandle;
   
@@ -52,6 +56,57 @@ const OrderConfirmation = () => {
     url.searchParams.delete('chainId');
     window.history.replaceState({}, document.title, url.toString());
   };
+
+  // Immediate check for URL parameters on first render
+  useEffect(() => {
+    // If we have txHash directly in URL parameters, use it immediately
+    if (txHash && orderId) {
+      console.log("Found txHash directly in URL parameters:", txHash);
+      
+      const result = { txHash, chainId };
+      setPaymentResult(result);
+      
+      // Store it for future use
+      localStorage.setItem(`payment_${orderId}`, JSON.stringify(result));
+      
+      // Load order details
+      try {
+        // Look for order details in localStorage using the orderId both with and without prefix
+        const storedDetails = localStorage.getItem(`order_${orderId}`) || localStorage.getItem(orderId);
+        
+        if (storedDetails) {
+          const parsedDetails = JSON.parse(storedDetails);
+          console.log("Found order details for txHash in URL:", parsedDetails);
+          setOrderDetails({
+            ...parsedDetails,
+            timestamp: parsedDetails.timestamp || format(new Date(), 'PPP p')
+          } as OrderDetails);
+        } else {
+          // For mobile, check the mobile_orders tracker
+          try {
+            const mobileOrders = JSON.parse(localStorage.getItem('mobile_orders') || '{}');
+            if (mobileOrders[orderId]) {
+              console.log("Found order in mobile_orders tracker:", mobileOrders[orderId]);
+              setOrderDetails({
+                ...mobileOrders[orderId],
+                timestamp: mobileOrders[orderId].timestamp || format(new Date(), 'PPP p')
+              } as OrderDetails);
+            }
+          } catch (e) {
+            console.error("Error checking mobile_orders:", e);
+          }
+        }
+      } catch (e) {
+        console.error("Error loading order details for URL txHash:", e);
+      }
+      
+      // Clean URL
+      cleanPaymentUrl();
+      
+      // Stop loading
+      setIsLoading(false);
+    }
+  }, [txHash, chainId, orderId]);
 
   // Special handling for mobile - check payment status more aggressively
   useEffect(() => {
@@ -229,6 +284,9 @@ const OrderConfirmation = () => {
 
   // Main data loading effect 
   useEffect(() => {
+    // Skip if we already have the payment result from URL params
+    if (paymentResult) return;
+    
     console.log("Confirmation Page - Raw URL Search Params:", window.location.search);
     
     // Try to parse payment information from URL (for redirect flow)
@@ -240,11 +298,22 @@ const OrderConfirmation = () => {
     
     if (orderId) {
       try {
-        // Look for order details in localStorage using the orderId both with and without prefix
+        // Look for order details in both potential localStorage locations
         const storedDetails = localStorage.getItem(`order_${orderId}`) || localStorage.getItem(orderId);
         const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
         
-        if (storedDetails) {
+        if (!storedDetails) {
+          // For mobile, check mobile_orders as a fallback
+          try {
+            const mobileOrders = JSON.parse(localStorage.getItem('mobile_orders') || '{}');
+            if (mobileOrders[orderId]) {
+              loadedOrderDetails = mobileOrders[orderId];
+              console.log("Loaded order details from mobile_orders:", loadedOrderDetails);
+            }
+          } catch (e) {
+            console.error("Error checking mobile_orders:", e);
+          }
+        } else {
           loadedOrderDetails = JSON.parse(storedDetails);
           console.log("Confirmation Page - Loaded Stored Order Details:", loadedOrderDetails);
         }
@@ -300,7 +369,7 @@ const OrderConfirmation = () => {
       }
     }
     setIsLoading(false);
-  }, [parsePaymentFromUrl, orderId]);
+  }, [parsePaymentFromUrl, orderId, paymentResult]);
 
   // Document title effect
   useEffect(() => {

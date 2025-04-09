@@ -209,8 +209,8 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         }
       }
       
-      // For mobile devices, ensure the redirect URL uses the full origin to avoid iframe issues
-      if (isMobile && !redirectUrl.startsWith('http')) {
+      // Ensure redirect URL is absolute, especially important for mobile
+      if (!redirectUrl.startsWith('http')) {
         redirectUrl = new URL(redirectUrl, window.location.origin).toString();
       }
       
@@ -236,38 +236,50 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         };
         localStorage.setItem(`order_${orderId}`, JSON.stringify(orderData));
         console.log(`Saved order data for ${orderId} before payment request`);
+        
+        // For mobile, also add to mobile_orders collection
+        if (isMobile) {
+          try {
+            const mobileOrders = JSON.parse(localStorage.getItem('mobile_orders') || '{}');
+            mobileOrders[orderId] = {
+              ...orderData,
+              createdAt: Date.now()
+            };
+            localStorage.setItem('mobile_orders', JSON.stringify(mobileOrders));
+          } catch (e) {
+            console.warn('Error saving to mobile_orders:', e);
+          }
+        }
       } catch (e) {
         console.warn('Could not save order data to localStorage', e);
       }
       
-      // For mobile, set up a periodic check for completion in case the redirect fails
-      let mobileCheckInterval: number | null = null;
+      // For mobile, handle direct navigation approach
       if (isMobile) {
-        mobileCheckInterval = window.setInterval(() => {
-          try {
-            console.log("Mobile payment check running...");
-            // 1. Check if we're already on the confirmation page
-            if (window.location.pathname.includes('confirmation')) {
-              if (mobileCheckInterval) clearInterval(mobileCheckInterval);
-              return;
-            }
-            
-            // 2. Check if payment completed
-            const storedPayment = localStorage.getItem(`payment_${params.orderId}`);
-            if (storedPayment) {
-              console.log("Mobile payment check found completed payment, redirecting");
-              if (mobileCheckInterval) clearInterval(mobileCheckInterval);
-              window.location.href = redirectUrl;
-            }
-          } catch (e) {
-            console.error("Error in mobile payment check:", e);
-          }
-        }, 2000); // Check every 2 seconds
-        
-        // Clear the interval after 2 minutes to prevent resource leaks
-        setTimeout(() => {
-          if (mobileCheckInterval) clearInterval(mobileCheckInterval);
-        }, 120000);
+        try {
+          // Create direct URL to Yodl
+          const yodlDirectUrl = `https://yodl.me/checkout?recipient=${encodeURIComponent(recipientIdentifier)}&amount=${params.amount}&currency=${params.currency}&memo=${params.orderId}&redirectUrl=${encodeURIComponent(redirectUrl)}`;
+
+          // For direct mobile navigation, we create a dummy result that will be updated by the redirect
+          localStorage.setItem(`payment_${params.orderId}`, JSON.stringify({
+            txHash: null,
+            chainId: null,
+            pendingMobile: true,
+            timestamp: new Date().toISOString()
+          }));
+          
+          // Return a fake result that indicates mobile navigation is taking place
+          return {
+            redirect: true,
+            mobileRedirect: true,
+            url: yodlDirectUrl,
+            orderId: params.orderId,
+            memo: params.orderId
+          };
+        } catch (e) {
+          console.error('Error preparing mobile redirect:', e);
+          // Fall through to the standard approach
+        }
       }
       
       // Request payment - this will open Yodl UI
@@ -279,11 +291,6 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
       });
 
       console.log("Payment request completed with result:", paymentResult);
-
-      // Clean up the mobile check interval if it exists
-      if (mobileCheckInterval) {
-        clearInterval(mobileCheckInterval);
-      }
 
       // If we got a direct result with txHash, handle it
       if (paymentResult?.txHash) {
@@ -320,7 +327,7 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
           console.log("Mobile device detected with payment success, forcing navigation");
           setTimeout(() => {
             window.location.href = redirectUrl;
-          }, 500);
+          }, 100);
         }
       }
 
