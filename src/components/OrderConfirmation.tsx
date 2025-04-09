@@ -10,7 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Download, ShoppingBag, Loader2, ExternalLink, Send } from "lucide-react";
+import { CheckCircle, Download, Home, Loader2, ExternalLink, Send } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -35,6 +35,7 @@ const OrderConfirmation = () => {
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showQrCode, setShowQrCode] = useState(false);
   const orderId = searchParams.get("orderId");
   const shop = shopConfig.shops[0];
   const shopTelegramHandle = shop?.telegramHandle;
@@ -48,45 +49,91 @@ const OrderConfirmation = () => {
   };
 
   useEffect(() => {
-    console.log("Confirmation Page - Raw URL Search Params:", window.location.search);
+    console.log("Confirmation Page - Raw URL Search Params:", window.location.search); // Log raw search params
     const result = yodl.parsePaymentFromUrl();
     console.log("Confirmation Page - Parsed URL Result:", JSON.stringify(result));
 
     let loadedOrderDetails: Partial<OrderDetails> | null = null;
+    let loadedPaymentResult: PaymentResult | null = null;
+    
     if (orderId) {
       try {
-        const storedDetails = localStorage.getItem(orderId);
+        const storedDetails = localStorage.getItem(`order_${orderId}`);
+        const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
+        
         if (storedDetails) {
           loadedOrderDetails = JSON.parse(storedDetails);
           console.log("Confirmation Page - Loaded Stored Order Details:", loadedOrderDetails);
         }
+        
+        if (storedPaymentResult) {
+          loadedPaymentResult = JSON.parse(storedPaymentResult);
+          console.log("Confirmation Page - Loaded Stored Payment Result:", loadedPaymentResult);
+        }
       } catch (e) {
-        console.error("Failed to load order details from localStorage", e);
+        console.error("Failed to load data from localStorage", e);
       }
     }
 
+    // Check specifically for txHash presence in URL first, then fallback to stored result
     if (result && result.txHash) {
       console.log(`Confirmation Page - Found txHash: ${result.txHash}, chainId: ${result.chainId}`);
       setPaymentResult(result);
-      if (loadedOrderDetails) {
-          setOrderDetails({
-            ...(loadedOrderDetails || {}),
-            timestamp: format(new Date(), 'PPP p'),
-          } as OrderDetails);
+      
+      // Store payment result in localStorage
+      if (orderId) {
+        localStorage.setItem(`payment_${orderId}`, JSON.stringify(result));
       }
-      cleanPaymentUrl();
-    } else {
-      console.log("Confirmation Page - No valid txHash found in URL parameters.");
+      
+      cleanPaymentUrl(); // Clean URL only after confirming txHash
+      setOrderDetails({
+        ...(loadedOrderDetails || {}),
+        timestamp: format(new Date(), 'PPP p'),
+      } as OrderDetails);
+      
+      // Make sure to store order details with the updated timestamp
       if (orderId && loadedOrderDetails) {
-        setOrderDetails({
+        localStorage.setItem(`order_${orderId}`, JSON.stringify({
+          ...(loadedOrderDetails || {}),
+          timestamp: format(new Date(), 'PPP p'),
+        }));
+      }
+    } else if (loadedPaymentResult && loadedPaymentResult.txHash) {
+      // Fallback to stored payment result if URL doesn't have transaction data
+      console.log("Confirmation Page - Using stored payment result:", loadedPaymentResult);
+      setPaymentResult(loadedPaymentResult);
+      
+      if (loadedOrderDetails) {
+        setOrderDetails(loadedOrderDetails as OrderDetails);
+      }
+    } else {
+      console.log("Confirmation Page - No valid txHash found in URL parameters or storage.");
+      // Load stored order details even if payment confirmation fails or isn't present
+      if (loadedOrderDetails) {
+         setOrderDetails({
            ...(loadedOrderDetails || {}),
-           timestamp: format(new Date(), 'PPP p'),
+           timestamp: loadedOrderDetails.timestamp || format(new Date(), 'PPP p'),
          } as OrderDetails);
       }
-      setPaymentResult(null); 
     }
     setIsLoading(false);
   }, [yodl, orderId]);
+
+  // Update localStorage key when loading order details
+  useEffect(() => {
+    if (orderId) {
+      try {
+        const storedDetails = localStorage.getItem(orderId);
+        if (storedDetails) {
+          // Migrate old storage format to new format
+          localStorage.setItem(`order_${orderId}`, storedDetails);
+          console.log("Migrated order details to new storage format");
+        }
+      } catch (e) {
+        console.error("Failed to migrate order details", e);
+      }
+    }
+  }, [orderId]);
 
   if (isLoading) {
     return (
@@ -98,48 +145,61 @@ const OrderConfirmation = () => {
 
   const isSuccess = paymentResult && paymentResult.txHash;
   const receiptData = JSON.stringify({ orderId, paymentResult, orderDetails });
-  const receiptQrValue = isSuccess ? window.location.href + `&txHash=${paymentResult.txHash}` : window.location.href;
+  const receiptQrValue = window.location.href;
   const yodlTxUrl = isSuccess ? `https://yodl.me/tx/${paymentResult.txHash}` : '';
 
-  // Construct pre-filled Telegram message carefully
-  let telegramLink = '#';
-  if (isSuccess && orderDetails && shop && shopTelegramHandle) {
+  // Construct pre-filled Telegram message
+  let telegramMessage = "";
+  if (isSuccess && orderDetails && shop) {
     const messageParts = [
-      `Hey, I just bought ${orderDetails.emoji} ${orderDetails.name} from ${shop.name}.`, // Keep emoji raw
+      `Hey, I just bought ${orderDetails.name} from ${shop.name}.`,
       `Where can I pick it up?`,
       `Here is the receipt: ${yodlTxUrl}`
     ];
-    const encodedMessage = encodeURIComponent(messageParts.join("\n\n"));
-    telegramLink = `https://t.me/${shopTelegramHandle}?text=${encodedMessage}`; 
+    telegramMessage = encodeURIComponent(messageParts.join("\n\n")); // Encode for URL
   }
+  const telegramLink = shopTelegramHandle ? `https://t.me/${shopTelegramHandle}?text=${telegramMessage}` : '#';
 
   return (
     <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-purple-900 dark:via-indigo-900 dark:to-purple-800">
       <header className="sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50">
-        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <Button asChild variant="ghost" size="sm">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold">Order Confirmation</h1>
+          <Button variant="outline" size="sm" asChild>
             <Link to="/">
-              <ShoppingBag className="mr-2 h-4 w-4" />
-              <span>Home</span>
+              <Home className="mr-2 h-4 w-4" />
+              Home
             </Link>
           </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 flex flex-col items-center">
-        <Card className="w-full max-w-2xl">
+      <main className="container mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
+        <Card className="w-full lg:w-2/3">
           <CardHeader>
-            {isLoading ? (
-              <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto" />
-            ) : isSuccess ? (
+            {isSuccess ? (
               <>
                 <div className="flex items-center justify-center mb-4">
                   <CheckCircle className="h-16 w-16 text-green-500" />
                 </div>
                 <CardTitle className="text-2xl text-center">Payment Successful!</CardTitle>
                 <CardDescription className="text-center">
-                  Your order details are below.
+                  Your order has been confirmed and is being processed.
                 </CardDescription>
+                {isSuccess && (
+                  <div className="mt-4 flex justify-center">
+                    <div className="p-2 bg-white rounded-lg">
+                      <QRCodeCanvas 
+                        value={receiptQrValue}
+                        size={180} 
+                        level={"H"}
+                        includeMargin={false}
+                        bgColor="#ffffff"
+                        fgColor="#000000"
+                      />
+                    </div>
+                  </div>
+                )}
               </>
             ) : (
               <CardTitle className="text-2xl text-center">Order Status</CardTitle>
@@ -196,27 +256,13 @@ const OrderConfirmation = () => {
                       Thank you for your purchase!
                     </p>
                   </div>
-                  <Separator />
-                  <div className="flex flex-col items-center gap-4 pt-4">
-                     <p className="text-sm font-medium text-center">Scan Receipt QR</p>
-                     <div className="p-2 bg-white rounded-lg">
-                       <QRCodeCanvas 
-                         value={receiptQrValue} 
-                         size={150} 
-                         level={"H"}
-                         includeMargin={false}
-                         bgColor="#ffffff"
-                         fgColor="#000000"
-                       />
-                     </div>
-                  </div>
                 </>
               ) : (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-center text-yellow-800">
-                    {orderId ? "Waiting for payment confirmation..." : "Order details not found."}
-                  </p>
-                </div>
+                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-center text-yellow-800">
+                      Waiting for payment confirmation or payment details not found.
+                    </p>
+                  </div>
               )}
             </div>
           </CardContent>
@@ -224,46 +270,51 @@ const OrderConfirmation = () => {
           <CardFooter className="flex flex-col sm:flex-row gap-4 justify-center">
             {isSuccess && shopTelegramHandle && (
               <Button 
-                variant="outline"
+                variant="default"
                 onClick={() => window.open(telegramLink, "_blank")}
               >
                 <Send className="mr-2 h-4 w-4" />
                 Contact Seller
               </Button>
             )}
-            {isSuccess && (
-              <Button variant="outline" onClick={() => window.print()}>
-                <Download className="mr-2 h-4 w-4" />
-                Save as PDF
-              </Button>
-            )}
+            
+            <Button variant="outline" size="sm" onClick={() => window.print()}>
+              <Download className="mr-2 h-4 w-4" />
+              Save as PDF
+            </Button>
           </CardFooter>
         </Card>
 
+        {/* Side Column (Transaction Preview only) */}
         {isSuccess && (
-          <Card className="w-full max-w-2xl mt-8">
-            <CardHeader>
-              <CardTitle className="text-lg text-center">Transaction Preview</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col items-center gap-2">
-              <p className="text-sm text-muted-foreground text-center px-2">Preview of the Yodl transaction page:</p>
-              <div className="w-full border rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 h-96">
-                <iframe
-                  src={yodlTxUrl}
-                  title="Yodl Transaction Preview"
-                  className="w-full h-full border-0"
-                  sandbox="allow-same-origin allow-scripts"
-                >
-                   Loading preview...
-                </iframe>
-              </div>
-               <Button asChild variant="link" size="sm">
-                 <a href={yodlTxUrl} target="_blank" rel="noopener noreferrer">
-                   View on yodl.me <ExternalLink className="ml-1 h-3 w-3" />
-                 </a>
-               </Button>
-            </CardContent>
-          </Card>
+          <div className="w-full lg:w-1/3 flex flex-col gap-8">
+            {/* Transaction Preview Card (iframe) */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg text-center">Transaction Preview</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col items-center gap-2">
+                <p className="text-sm text-muted-foreground text-center px-2">Preview of the Yodl transaction page:</p>
+                <div className="w-full aspect-[1.91/2.6] lg:aspect-[1.91/2.4] border rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"> 
+                  {/* 30% longer on mobile (aspect-[1.91/2.6]), 20% longer on desktop (lg:aspect-[1.91/2.4]) */}
+                  <iframe
+                    src={yodlTxUrl}
+                    title="Yodl Transaction Preview"
+                    className="w-full h-full border-0"
+                    // Basic sandbox for security, adjust if needed
+                    sandbox="allow-same-origin allow-scripts"
+                  >
+                     Loading preview...
+                  </iframe>
+                </div>
+                 <Button asChild variant="link" size="sm">
+                   <a href={yodlTxUrl} target="_blank" rel="noopener noreferrer">
+                     View on yodl.me <ExternalLink className="ml-1 h-3 w-3" />
+                   </a>
+                 </Button>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </main>
     </div>
