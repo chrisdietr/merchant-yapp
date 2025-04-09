@@ -48,7 +48,7 @@ const OrderConfirmation = () => {
   };
 
   useEffect(() => {
-    console.log("Confirmation Page - Raw URL Search Params:", window.location.search); // Log raw search params
+    console.log("Confirmation Page - Raw URL Search Params:", window.location.search);
     const result = yodl.parsePaymentFromUrl();
     console.log("Confirmation Page - Parsed URL Result:", JSON.stringify(result));
 
@@ -65,24 +65,25 @@ const OrderConfirmation = () => {
       }
     }
 
-    // Check specifically for txHash presence
     if (result && result.txHash) {
       console.log(`Confirmation Page - Found txHash: ${result.txHash}, chainId: ${result.chainId}`);
       setPaymentResult(result);
-      cleanPaymentUrl(); // Clean URL only after confirming txHash
-      setOrderDetails({
-        ...(loadedOrderDetails || {}),
-        timestamp: format(new Date(), 'PPP p'),
-      } as OrderDetails);
+      if (loadedOrderDetails) {
+          setOrderDetails({
+            ...(loadedOrderDetails || {}),
+            timestamp: format(new Date(), 'PPP p'),
+          } as OrderDetails);
+      }
+      cleanPaymentUrl();
     } else {
       console.log("Confirmation Page - No valid txHash found in URL parameters.");
-      // Load stored details even if payment confirmation fails or isn't present
-      if (loadedOrderDetails) {
-         setOrderDetails({
+      if (orderId && loadedOrderDetails) {
+        setOrderDetails({
            ...(loadedOrderDetails || {}),
-           timestamp: format(new Date(), 'PPP p'), // Add current timestamp
+           timestamp: format(new Date(), 'PPP p'),
          } as OrderDetails);
       }
+      setPaymentResult(null); 
     }
     setIsLoading(false);
   }, [yodl, orderId]);
@@ -97,40 +98,47 @@ const OrderConfirmation = () => {
 
   const isSuccess = paymentResult && paymentResult.txHash;
   const receiptData = JSON.stringify({ orderId, paymentResult, orderDetails });
-  const receiptQrValue = window.location.href;
+  const receiptQrValue = isSuccess ? window.location.href + `&txHash=${paymentResult.txHash}` : window.location.href;
   const yodlTxUrl = isSuccess ? `https://yodl.me/tx/${paymentResult.txHash}` : '';
 
-  // Construct pre-filled Telegram message
-  let telegramMessage = "";
-  if (isSuccess && orderDetails && shop) {
+  // Construct pre-filled Telegram message carefully
+  let telegramLink = '#';
+  if (isSuccess && orderDetails && shop && shopTelegramHandle) {
     const messageParts = [
-      `Hey, I just bought ${orderDetails.emoji} ${orderDetails.name} from ${shop.name}.`,
+      `Hey, I just bought ${orderDetails.emoji} ${orderDetails.name} from ${shop.name}.`, // Keep emoji raw
       `Where can I pick it up?`,
       `Here is the receipt: ${yodlTxUrl}`
     ];
-    telegramMessage = encodeURIComponent(messageParts.join("\n\n")); // Encode for URL
+    const encodedMessage = encodeURIComponent(messageParts.join("\n\n"));
+    telegramLink = `https://t.me/${shopTelegramHandle}?text=${encodedMessage}`; 
   }
-  const telegramLink = shopTelegramHandle ? `https://t.me/${shopTelegramHandle}?text=${telegramMessage}` : '#';
 
   return (
     <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-purple-900 dark:via-indigo-900 dark:to-purple-800">
       <header className="sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Order Confirmation</h1>
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          <Button asChild variant="ghost" size="sm">
+            <Link to="/">
+              <ShoppingBag className="mr-2 h-4 w-4" />
+              <span>Home</span>
+            </Link>
+          </Button>
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-8 flex flex-col lg:flex-row gap-8">
-        <Card className="w-full lg:w-2/3">
+      <main className="container mx-auto px-4 py-8 flex flex-col items-center">
+        <Card className="w-full max-w-2xl">
           <CardHeader>
-            {isSuccess ? (
+            {isLoading ? (
+              <Loader2 className="h-16 w-16 animate-spin text-primary mx-auto" />
+            ) : isSuccess ? (
               <>
                 <div className="flex items-center justify-center mb-4">
                   <CheckCircle className="h-16 w-16 text-green-500" />
                 </div>
                 <CardTitle className="text-2xl text-center">Payment Successful!</CardTitle>
                 <CardDescription className="text-center">
-                  Your order has been confirmed and is being processed.
+                  Your order details are below.
                 </CardDescription>
               </>
             ) : (
@@ -188,25 +196,32 @@ const OrderConfirmation = () => {
                       Thank you for your purchase!
                     </p>
                   </div>
+                  <Separator />
+                  <div className="flex flex-col items-center gap-4 pt-4">
+                     <p className="text-sm font-medium text-center">Scan Receipt QR</p>
+                     <div className="p-2 bg-white rounded-lg">
+                       <QRCodeCanvas 
+                         value={receiptQrValue} 
+                         size={150} 
+                         level={"H"}
+                         includeMargin={false}
+                         bgColor="#ffffff"
+                         fgColor="#000000"
+                       />
+                     </div>
+                  </div>
                 </>
               ) : (
-                 <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-center text-yellow-800">
-                      Waiting for payment confirmation or payment details not found.
-                    </p>
-                  </div>
+                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-center text-yellow-800">
+                    {orderId ? "Waiting for payment confirmation..." : "Order details not found."}
+                  </p>
+                </div>
               )}
             </div>
           </CardContent>
           
           <CardFooter className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild>
-              <Link to="/">
-                <ShoppingBag className="mr-2 h-4 w-4" />
-                Continue Shopping
-              </Link>
-            </Button>
-            
             {isSuccess && shopTelegramHandle && (
               <Button 
                 variant="outline"
@@ -216,63 +231,39 @@ const OrderConfirmation = () => {
                 Contact Seller
               </Button>
             )}
+            {isSuccess && (
+              <Button variant="outline" onClick={() => window.print()}>
+                <Download className="mr-2 h-4 w-4" />
+                Save as PDF
+              </Button>
+            )}
           </CardFooter>
         </Card>
 
-        {/* Side Column (QR + Preview) */}
         {isSuccess && (
-          <div className="w-full lg:w-1/3 flex flex-col gap-8">
-            {/* Receipt QR Code Card */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg text-center">Share Receipt</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center gap-4">
-                <div className="p-2 bg-white rounded-lg">
-                  <QRCodeCanvas 
-                    value={receiptQrValue}
-                    size={180} 
-                    level={"H"}
-                    includeMargin={false}
-                    bgColor="#ffffff"
-                    fgColor="#000000"
-                  />
-                </div>
-                <p className="text-sm text-muted-foreground text-center">Scan to view this confirmation page.</p>
-                <Button variant="outline" size="sm" onClick={() => window.print()}>
-                  <Download className="mr-2 h-4 w-4" />
-                  Save as PDF
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Transaction Preview Card (iframe) */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg text-center">Transaction Preview</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col items-center gap-2">
-                <p className="text-sm text-muted-foreground text-center px-2">Preview of the Yodl transaction page:</p>
-                <div className="w-full aspect-[1.91/1] border rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"> 
-                  {/* Aspect ratio ~1.91:1 is common for social cards */}
-                  <iframe
-                    src={yodlTxUrl}
-                    title="Yodl Transaction Preview"
-                    className="w-full h-full border-0"
-                    // Basic sandbox for security, adjust if needed
-                    sandbox="allow-same-origin allow-scripts"
-                  >
-                     Loading preview...
-                  </iframe>
-                </div>
-                 <Button asChild variant="link" size="sm">
-                   <a href={yodlTxUrl} target="_blank" rel="noopener noreferrer">
-                     View on yodl.me <ExternalLink className="ml-1 h-3 w-3" />
-                   </a>
-                 </Button>
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="w-full max-w-2xl mt-8">
+            <CardHeader>
+              <CardTitle className="text-lg text-center">Transaction Preview</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col items-center gap-2">
+              <p className="text-sm text-muted-foreground text-center px-2">Preview of the Yodl transaction page:</p>
+              <div className="w-full border rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 h-96">
+                <iframe
+                  src={yodlTxUrl}
+                  title="Yodl Transaction Preview"
+                  className="w-full h-full border-0"
+                  sandbox="allow-same-origin allow-scripts"
+                >
+                   Loading preview...
+                </iframe>
+              </div>
+               <Button asChild variant="link" size="sm">
+                 <a href={yodlTxUrl} target="_blank" rel="noopener noreferrer">
+                   View on yodl.me <ExternalLink className="ml-1 h-3 w-3" />
+                 </a>
+               </Button>
+            </CardContent>
+          </Card>
         )}
       </main>
     </div>
