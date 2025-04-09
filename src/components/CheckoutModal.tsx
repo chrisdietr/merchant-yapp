@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -16,10 +16,11 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
-  QrCode,
   ExternalLink,
   Copy,
 } from "lucide-react";
+import { useYodl } from '../contexts/YodlContext';
+import { QRCodeCanvas } from 'qrcode.react';
 
 interface Product {
   id: string;
@@ -34,7 +35,12 @@ interface CheckoutModalProps {
   isOpen?: boolean;
   onClose?: () => void;
   product?: Product;
-  paymentLink?: string;
+  walletAddress?: string;
+  shopConfig?: {
+    name: string;
+    telegramHandle?: string;
+  };
+  onPayment?: (product: Product) => Promise<void>;
 }
 
 const CheckoutModal = ({
@@ -48,42 +54,91 @@ const CheckoutModal = ({
     currency: "CHF",
     emoji: "☕",
   },
-  paymentLink = "https://yodl.me/0x123abc?amount=2.5&currency=CHF",
+  walletAddress,
+  shopConfig,
+  onPayment,
 }: CheckoutModalProps) => {
   const [paymentStatus, setPaymentStatus] = useState<
     "pending" | "processing" | "success" | "failed"
   >("pending");
   const [progress, setProgress] = useState(0);
+  const { createPayment, merchantAddress, merchantEns } = useYodl();
+  const [orderId] = useState(`order_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+  
+  // Reset payment status when modal opens and store product details
+  useEffect(() => {
+    if (isOpen && product) {
+      setPaymentStatus("pending");
+      setProgress(0);
+      // Store product details for confirmation page
+      try {
+        localStorage.setItem(orderId, JSON.stringify({
+          name: product.name,
+          price: product.price,
+          currency: product.currency,
+          emoji: product.emoji
+        }));
+      } catch (e) {
+        console.error("Failed to save order details to localStorage", e);
+      }
+    }
+  }, [isOpen, product, orderId]);
 
-  // Simulate payment processing
-  const handleStartPayment = () => {
+  const handleStartPayment = async () => {
+    if (!product) return;
     setPaymentStatus("processing");
 
-    // Simulate progress updates
-    const interval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setPaymentStatus("success");
-          // Here you would trigger merchant notifications
-          return 100;
-        }
-        return prev + 10;
+    try {
+      // Generate a confirmation page URL
+      const confirmationUrl = `${window.location.origin}/confirmation?orderId=${orderId}`;
+      
+      const payment = await createPayment({
+        amount: product.price,
+        currency: product.currency,
+        description: product.name,
+        metadata: {
+          productId: product.id,
+          productName: product.name,
+          orderId: orderId
+        },
+        redirectUrl: confirmationUrl
       });
-    }, 500);
+
+      // If we get here without a redirect, the payment was successful in iframe mode
+      // Although this shouldn't happen in standalone mode, handle it just in case
+      setProgress(100);
+      setPaymentStatus("success");
+
+    } catch (error) {
+      console.error('Payment failed:', error);
+      if (error.message !== 'Payment was cancelled') {
+         setPaymentStatus("failed");
+      } else {
+        // If cancelled, reset to pending
+        setPaymentStatus("pending"); 
+        setProgress(0);
+      }
+    }
+  };
+
+  // Generate the direct payment link (still useful for QR code data)
+  const getPaymentLink = () => {
+    if (!product) return '';
+    const identifier = merchantEns || merchantAddress;
+    const confirmationUrl = encodeURIComponent(`${window.location.origin}/confirmation?orderId=${orderId}`);
+    return `https://yodl.me/${identifier}?amount=${product.price}&currency=${product.currency}&redirectUrl=${confirmationUrl}`;
   };
 
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(paymentLink);
-    // You could add a toast notification here
+    navigator.clipboard.writeText(getPaymentLink());
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[500px] bg-background">
+      <DialogContent className="sm:max-w-md w-[90%] bg-background rounded-lg">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-            <span>{product.emoji}</span>
+            <span>{product?.emoji}</span>
             <span>Checkout</span>
           </DialogTitle>
           <DialogDescription>
@@ -94,18 +149,18 @@ const CheckoutModal = ({
         <div className="mt-4">
           <Card className="border border-border">
             <CardContent className="pt-6">
-              <div className="flex justify-between items-start mb-4">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
-                  <h3 className="font-medium text-lg">{product.name}</h3>
+                  <h3 className="font-medium text-lg">{product?.name}</h3>
                   <p className="text-muted-foreground text-sm">
-                    {product.description}
+                    {product?.description}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                   <p className="font-bold text-lg">
-                    {product.price} {product.currency}
+                    {product?.price} {product?.currency}
                   </p>
-                  <Badge variant="outline" className="mt-1">
+                  <Badge className="mt-1">
                     Crypto Payment
                   </Badge>
                 </div>
@@ -118,43 +173,31 @@ const CheckoutModal = ({
 
         {paymentStatus === "pending" && (
           <div className="flex flex-col items-center gap-4">
-            <div className="bg-muted p-4 rounded-lg w-full max-w-[250px] h-[250px] flex items-center justify-center">
-              <QrCode size={200} className="text-primary" />
-            </div>
-
-            <div className="flex flex-col gap-2 w-full">
-              <Button onClick={handleStartPayment} className="w-full">
-                Pay with Wallet
-              </Button>
-
-              <div className="flex gap-2 w-full">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => window.open(paymentLink, "_blank")}
-                >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Open Link
-                </Button>
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={handleCopyLink}
-                >
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy Link
-                </Button>
-              </div>
-            </div>
+            <p className="text-sm text-muted-foreground text-center px-4">Scan or click the QR code to open the payment link in your wallet app.</p>
+            <button 
+              onClick={handleStartPayment} 
+              className="p-4 rounded-lg w-full max-w-[250px] h-auto aspect-square flex items-center justify-center transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-white dark:bg-gray-100"
+              aria-label="Start Payment with QR Code"
+            >
+              <QRCodeCanvas 
+                value={getPaymentLink()} 
+                size={200}
+                level={"H"}
+                includeMargin={false}
+                className="w-full h-full"
+                bgColor="#ffffff"
+                fgColor="#000000"
+              />
+            </button>
           </div>
         )}
 
         {paymentStatus === "processing" && (
           <div className="flex flex-col items-center gap-4 py-6">
-            <Loader2 className="h-16 w-16 animate-spin text-primary" />
-            <h3 className="text-xl font-medium">Processing Payment</h3>
-            <Progress value={progress} className="w-full" />
-            <p className="text-muted-foreground text-sm text-center">
+            <Loader2 className="h-12 w-12 sm:h-16 sm:w-16 animate-spin text-primary" />
+            <h3 className="text-lg sm:text-xl font-medium">Processing Payment</h3>
+            <Progress value={progress} className="w-full max-w-xs" />
+            <p className="text-muted-foreground text-sm text-center px-4">
               Please wait while we confirm your transaction on the blockchain.
             </p>
           </div>
@@ -162,13 +205,22 @@ const CheckoutModal = ({
 
         {paymentStatus === "success" && (
           <div className="flex flex-col items-center gap-4 py-6">
-            <CheckCircle className="h-16 w-16 text-green-500" />
-            <h3 className="text-xl font-medium">Payment Successful!</h3>
-            <p className="text-muted-foreground text-sm text-center">
-              Your payment has been confirmed. The merchant has been notified of
-              your purchase.
+            <CheckCircle className="h-12 w-12 sm:h-16 sm:w-16 text-green-500" />
+            <h3 className="text-lg sm:text-xl font-medium">Payment Successful!</h3>
+            <p className="text-muted-foreground text-sm text-center px-4">
+              Your payment has been confirmed. You can close this modal.
             </p>
-            <Button onClick={onClose} className="mt-2">
+            {shopConfig?.telegramHandle && (
+              <Button
+                className="mt-2"
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(`https://t.me/${shopConfig.telegramHandle}`, "_blank")}
+              >
+                Contact Seller on Telegram
+              </Button>
+            )}
+            <Button onClick={onClose} className="mt-2" size="sm">
               Return to Shop
             </Button>
           </div>
@@ -176,23 +228,23 @@ const CheckoutModal = ({
 
         {paymentStatus === "failed" && (
           <div className="flex flex-col items-center gap-4 py-6">
-            <XCircle className="h-16 w-16 text-destructive" />
-            <h3 className="text-xl font-medium">Payment Failed</h3>
-            <p className="text-muted-foreground text-sm text-center">
-              There was an issue processing your payment. Please try again or
-              use a different payment method.
+            <XCircle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive" />
+            <h3 className="text-lg sm:text-xl font-medium">Payment Failed</h3>
+            <p className="text-muted-foreground text-sm text-center px-4">
+              There was an issue processing your payment. Please try again.
             </p>
-            <div className="flex gap-2 w-full max-w-xs">
+            <div className="flex gap-2 w-full max-w-xs mt-2">
               <Button
-                variant="outline"
-                onClick={() => setPaymentStatus("pending")}
                 className="flex-1"
+                size="sm"
+                onClick={() => setPaymentStatus("pending")}
               >
                 Try Again
               </Button>
               <Button
                 onClick={onClose}
-                variant="destructive"
+                variant="outline"
+                size="sm"
                 className="flex-1"
               >
                 Cancel
@@ -201,16 +253,8 @@ const CheckoutModal = ({
           </div>
         )}
 
-        <DialogFooter className="flex flex-col sm:flex-row gap-2">
-          {paymentStatus === "pending" && (
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="w-full sm:w-auto"
-            >
-              Cancel
-            </Button>
-          )}
+        <DialogFooter className="mt-4 sm:mt-6">
+          {/* Footer buttons removed/simplified as main action is QR click */}
         </DialogFooter>
       </DialogContent>
     </Dialog>

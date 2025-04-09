@@ -1,30 +1,124 @@
-# React + TypeScript + Vite
+# Merchant Yapp
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A decentralized point-of-sale application with crypto payments built with React, Vite, RainbowKit, and Yodl SDK. Perfect for merchants who want to accept cryptocurrency payments with a beautiful and intuitive UI.
 
-Currently, two official plugins are available:
+## Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Wallet Connection**: Easy integration with MetaMask and other wallets via RainbowKit
+- **Product Management**: Simple configuration to add, remove, or update products
+- **Theme Support**: Beautiful purple theme with both light and dark mode
+- **Fully Responsive Design**: Optimized for mobile, tablet, and desktop devices
+- **Mobile-Friendly UI**: Fixed navigation bar, touch-optimized buttons, and smooth interactions
+- **Order Confirmations**: Clean, shareable receipts with product details and QR codes
+- **Telegram Integration**: Direct customer communication with transaction receipts
+- **Inventory Management**: Support for in-stock, out-of-stock, and unlimited inventory
 
-## Expanding the ESLint configuration
+## Quick Start
 
-If you are developing a production application, we recommend updating the configuration to enable type aware lint rules:
+### Prerequisites
 
-- Configure the top-level `parserOptions` property like this:
+- Node.js (v16 or higher)
+- npm or yarn
+- MetaMask or other Web3 wallet
+- Basic understanding of React and JavaScript
 
-```js
-export default {
-  // other rules...
-  parserOptions: {
-    ecmaVersion: 'latest',
-    sourceType: 'module',
-    project: ['./tsconfig.json', './tsconfig.node.json'],
-    tsconfigRootDir: __dirname,
-  },
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/yourusername/merchant-yapp.git
+cd merchant-yapp
+```
+
+2. Install dependencies:
+```bash
+npm install
+# or
+yarn install
+```
+
+3. Configure your environment:
+   - Copy `.env.example` to `.env`
+   - Add your WalletConnect Project ID and Alchemy API key
+
+4. Start the development server:
+```bash
+npm run dev
+# or
+yarn dev
+```
+
+5. Open your browser and navigate to `http://localhost:5173`
+
+## Configuration
+
+### Step 1: Configure Your Admin Wallet
+
+1. Open `src/config/admin.json` and configure your wallet:
+
+```json
+{
+  "admins": [
+    {
+      "ens": "YOUR_ENS_NAME.eth",
+      "address": "0xYOUR_WALLET_ADDRESS"
+    }
+  ]
 }
 ```
 
-- Replace `plugin:@typescript-eslint/recommended` to `plugin:@typescript-eslint/recommended-type-checked` or `plugin:@typescript-eslint/strict-type-checked`
-- Optionally add `plugin:@typescript-eslint/stylistic-type-checked`
-- Install [eslint-plugin-react](https://github.com/jsx-eslint/eslint-plugin-react) and add `plugin:react/recommended` & `plugin:react/jsx-runtime` to the `extends` list
+### Step 2: Configure Your Shop
+
+1. Open `src/config/shops.json` and customize your shop information:
+
+```json
+{
+  "shops": [
+    {
+      "name": "Your Shop Name",
+      "telegramHandle": "your_telegram_handle"
+    }
+  ],
+  "products": [
+    {
+      "id": "1",
+      "name": "T-Shirt",
+      "description": "Premium cotton t-shirt",
+      "price": 0.1,
+      "currency": "USD",
+      "emoji": "👕",
+      "inStock": true
+    }
+  ]
+}
+```
+
+## Product Configuration Options
+
+| Field | Description | Example Values |
+|-------|-------------|----------------|
+| id | Unique identifier for the product | "1", "coffee-01" |
+| name | Product name | "Coffee", "T-Shirt" |
+| description | Short product description | "Freshly brewed" |
+| price | Product price (decimal) | 0.1, 25, 199.99 |
+| currency | Currency code | "BRL", "USD", "EUR", "CHF", "THB" |
+| emoji | Visual representation | "☕", "👕", "🧢" |
+| inStock | Availability status | true, false, "infinite" |
+
+## Deployment
+
+To deploy your application:
+
+1. Build the production version:
+```bash
+npm run build
+# or
+yarn build
+```
+
+2. The build output will be in the `dist` directory
+3. Deploy this directory to your web hosting service
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

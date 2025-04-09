@@ -1,0 +1,37 @@
+{
+  "shops": [
+    {
+      "name": "Merchant Yapp Demo Shop",
+      "telegramHandle": "yodl_tam"
+    }
+  ],
+  "products": [
+    {
+      "id": "1",
+      "name": "Shirt",
+      "description": "Available in sizes S, M, L, XL, XXL",
+      "price": 0.1,
+      "currency": "USD",
+      "emoji": "👕",
+      "inStock": true
+    },
+    {
+      "id": "2",
+      "name": "Hat",
+      "description": "One size fits all.",
+      "price": 0.05,
+      "currency": "BRL",
+      "emoji": "🧢",
+      "inStock": "true"
+    },
+    {
+      "id": "3",
+      "name": "Beer",
+      "description": "Infinite stock.",
+      "price": 0.69,
+      "currency": "THB",
+      "emoji": "🍺",
+      "inStock": "true"
+    }
+  ]
+} 

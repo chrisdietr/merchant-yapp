@@ -1,18 +1,58 @@
 import { Suspense } from "react";
 import { useRoutes, Routes, Route } from "react-router-dom";
+import { RainbowKitProvider, getDefaultWallets } from '@rainbow-me/rainbowkit';
+import { createConfig, http, WagmiConfig } from 'wagmi';
+import { mainnet, polygon, optimism, arbitrum, base, gnosis } from 'wagmi/chains';
+import { YodlProvider } from './contexts/YodlContext';
 import Home from "./components/home";
+import OrderConfirmation from "./components/OrderConfirmation";
 import routes from "tempo-routes";
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from './contexts/ThemeContext';
+
+const chains = [mainnet, polygon, optimism, arbitrum, base, gnosis] as const;
+
+const { connectors } = getDefaultWallets({
+  appName: 'Merchant Yapp',
+  projectId: '08ab6e0bb13605f4b9d678b99067a0c2',
+});
+
+const wagmiConfig = createConfig({
+  chains,
+  connectors,
+  transports: {
+    [mainnet.id]: http(),
+    [polygon.id]: http(),
+    [optimism.id]: http(),
+    [arbitrum.id]: http(),
+    [base.id]: http(),
+    [gnosis.id]: http(),
+  },
+});
+
+const queryClient = new QueryClient();
 
 function App() {
   return (
-    <Suspense fallback={<p>Loading...</p>}>
-      <>
-        <Routes>
-          <Route path="/" element={<Home />} />
-        </Routes>
-        {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
-      </>
-    </Suspense>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <WagmiConfig config={wagmiConfig}>
+          <RainbowKitProvider>
+            <YodlProvider>
+              <Suspense fallback={<p>Loading...</p>}>
+                <div className="bg-background text-foreground min-h-screen">
+                  <Routes>
+                    <Route path="/" element={<Home />} />
+                    <Route path="/confirmation" element={<OrderConfirmation />} />
+                  </Routes>
+                  {import.meta.env.VITE_TEMPO === "true" && useRoutes(routes)}
+                </div>
+              </Suspense>
+            </YodlProvider>
+          </RainbowKitProvider>
+        </WagmiConfig>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
 
