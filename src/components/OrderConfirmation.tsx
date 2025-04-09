@@ -15,6 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 import { QRCodeCanvas } from 'qrcode.react';
 import shopConfig from "../config/shops.json";
+import ThemeToggle from "./ThemeToggle";
 
 interface PaymentResult {
   txHash?: string | null; 
@@ -166,12 +167,15 @@ const OrderConfirmation = () => {
       <header className="sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">Order Confirmation</h1>
-          <Button variant="outline" size="sm" asChild>
-            <Link to="/">
-              <Home className="mr-2 h-4 w-4" />
-              Home
-            </Link>
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/">
+                <Home className="mr-2 h-4 w-4" />
+                Home
+              </Link>
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -246,10 +250,10 @@ const OrderConfirmation = () => {
                         to={`https://yodl.me/tx/${paymentResult.txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-right font-mono truncate text-primary hover:underline flex items-center justify-end gap-1"
+                        className="text-right font-mono text-primary hover:underline flex items-center justify-end gap-1 break-all overflow-hidden"
                       >
                         {paymentResult.txHash}
-                        <ExternalLink className="h-3 w-3 inline-block" />
+                        <ExternalLink className="h-3 w-3 flex-shrink-0" />
                       </Link>
                     </div>
                   </div>
@@ -298,17 +302,24 @@ const OrderConfirmation = () => {
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-2">
                 <p className="text-sm text-muted-foreground text-center px-2">Preview of the Yodl transaction page:</p>
-                <div className="w-full aspect-[1.91/2.6] lg:aspect-[1.91/2.4] border rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800"> 
-                  {/* 30% longer on mobile (aspect-[1.91/2.6]), 20% longer on desktop (lg:aspect-[1.91/2.4]) */}
-                  <iframe
-                    src={yodlTxUrl}
-                    title="Yodl Transaction Preview"
-                    className="w-full h-full border-0"
-                    // Basic sandbox for security, adjust if needed
-                    sandbox="allow-same-origin allow-scripts"
-                  >
-                     Loading preview...
-                  </iframe>
+                <div className="w-full aspect-[1.91/3.12] lg:aspect-[1.91/2.88] border rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800 relative"> 
+                  {/* Increased height by 20% from previous values */}
+                  <div className="relative w-full h-full">
+                    {/* Overlay with "Transaction Details" text */}
+                    <div className="absolute top-0 left-0 right-0 flex items-center justify-center z-10 bg-black py-2">
+                      <div className="text-white font-medium">
+                        Transaction Details
+                      </div>
+                    </div>
+                    <iframe
+                      src={yodlTxUrl}
+                      title="Yodl Transaction Preview"
+                      className="w-full h-full border-0 relative z-0"
+                      sandbox="allow-same-origin allow-scripts"
+                    >
+                      Loading preview...
+                    </iframe>
+                  </div>
                 </div>
                  <Button asChild variant="link" size="sm">
                    <a href={yodlTxUrl} target="_blank" rel="noopener noreferrer">
