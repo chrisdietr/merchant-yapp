@@ -12,7 +12,11 @@
         },
         {
           "key": "X-Frame-Options",
-          "value": "DENY"
+          "value": "ALLOW-FROM https://yodl.me"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "frame-ancestors 'self' https://yodl.me"
         },
         {
           "key": "X-XSS-Protection",
