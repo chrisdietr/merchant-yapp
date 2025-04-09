@@ -31,20 +31,30 @@ const PaymentBridge: React.FC = () => {
           localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
           console.log(`PaymentBridge: Stored payment for ${orderId} in localStorage.`);
 
-          // 2. Check if already on the correct confirmation page
+          // 2. Construct the full confirmation URL including txHash and chainId
+          const confirmationUrl = new URL(generateConfirmationUrl(orderId)); // Base: /confirmation?orderId=...
+          confirmationUrl.searchParams.set('txHash', txHash);
+          if (chainId !== undefined) { // Only add chainId if it exists and is not null/undefined
+             confirmationUrl.searchParams.set('chainId', String(chainId));
+          }
+          const fullConfirmationPath = confirmationUrl.pathname + confirmationUrl.search;
+          console.log("PaymentBridge: Constructed full confirmation path:", fullConfirmationPath);
+
+          // 3. Check if already on the correct confirmation page (or similar enough)
           const currentPath = window.location.pathname;
           const currentSearchParams = new URLSearchParams(window.location.search);
           const currentOrderId = currentSearchParams.get('orderId');
+          const currentTxHash = currentSearchParams.get('txHash');
 
-          if (currentPath.includes('/confirmation') && currentOrderId === orderId) {
-            console.log('PaymentBridge: Already on the correct confirmation page. Refreshing data might be needed if state not updated.');
-            // Optional: Force a re-render or state update if needed, though OrderConfirmation polling should handle it.
+          // Only navigate if we are not already on the confirmation page for this specific tx
+          if (!(currentPath.includes('/confirmation') && currentOrderId === orderId && currentTxHash === txHash)) {
+             console.log(`PaymentBridge: Navigating to full confirmation page: ${fullConfirmationPath}`);
+             // Use replace state navigation to avoid polluting browser history
+             navigateRef.current(fullConfirmationPath, { replace: true });
           } else {
-            // 3. Navigate to the confirmation page
-            const confirmationPath = `/confirmation?orderId=${orderId}`;
-            console.log(`PaymentBridge: Navigating to confirmation page: ${confirmationPath}`);
-            // Use replace to avoid adding the intermediate page to history
-            navigateRef.current(confirmationPath, { replace: true }); 
+             console.log('PaymentBridge: Already on the correct confirmation page with txHash. No navigation needed.');
+             // If already on the page, ensure localStorage is set (already done above)
+             // OrderConfirmation component polling/initial check should handle UI update.
           }
         } catch (e) {
           console.error("PaymentBridge: Error processing payment message:", e);

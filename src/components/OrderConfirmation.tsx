@@ -32,150 +32,117 @@ interface OrderDetails {
 }
 
 const OrderConfirmation = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { yodl, merchantAddress, merchantEns, isInIframe, parsePaymentFromUrl } = useYodl(); 
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<string | null>(null);
+  
   const orderId = searchParams.get("orderId");
+  const urlTxHash = searchParams.get("txHash");
+  const urlChainId = searchParams.get("chainId");
+
   const shop = shopConfig.shops[0];
   const shopTelegramHandle = shop?.telegramHandle;
   
   // Detect if we're on a mobile device
   const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-  // Helper function to clean payment parameters from URL
-  const cleanPaymentUrl = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('txHash');
-    url.searchParams.delete('chainId');
-    window.history.replaceState({}, document.title, url.toString());
+  // Helper function to clean specific parameters from URL without reload
+  const cleanUrlParams = (paramsToRemove: string[]) => {
+    const newSearchParams = new URLSearchParams(searchParams);
+    paramsToRemove.forEach(param => newSearchParams.delete(param));
+    // Use replace: true to avoid adding to browser history
+    setSearchParams(newSearchParams, { replace: true }); 
   };
 
   // Primary Effect: Detect Payment Completion and Load Data
   useEffect(() => {
     if (!orderId) {
-      setError("Order ID is missing.");
+      setError("Order ID is missing from URL.");
       setIsLoading(false);
       return;
     }
 
     console.log(`Order Confirmation: Starting check for orderId: ${orderId}`);
-    setIsLoading(true); // Start in loading state
+    setIsLoading(true); 
     setError(null);
+    setWarning(null);
     setPaymentResult(null);
     setOrderDetails(null);
 
-    const checkPaymentStatus = () => {
-      let foundPaymentResult: PaymentResult | null = null;
+    let confirmedPayment: PaymentResult | null = null;
 
-      // 1. Check URL parameters (for direct redirect)
-      try {
-        const urlResult = parsePaymentFromUrl();
-        if (urlResult && urlResult.txHash && (urlResult.memo === orderId || !urlResult.memo)) {
-          console.log("Found payment result in URL params:", urlResult);
-          foundPaymentResult = { txHash: urlResult.txHash, chainId: urlResult.chainId };
-          cleanPaymentUrl(); // Clean URL after processing
-        }
-      } catch (e) {
-        console.warn("Error parsing URL for payment:", e);
-      }
-
-      // 2. Check localStorage (most reliable method)
-      if (!foundPaymentResult) {
-        try {
-          const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
-          if (storedPaymentResult) {
-            const parsedResult = JSON.parse(storedPaymentResult);
-            if (parsedResult.txHash) {
-              console.log("Found payment result in localStorage:", parsedResult);
-              foundPaymentResult = parsedResult;
-            }
-          }
-        } catch (e) {
-          console.warn("Error parsing localStorage for payment:", e);
-        }
-      }
-      
-      return foundPaymentResult;
-    };
-
-    const loadOrderDetails = () => {
-      try {
-        const storedDetails = localStorage.getItem(orderId) || localStorage.getItem(`order_${orderId}`);
-        if (storedDetails) {
-          const parsedDetails = JSON.parse(storedDetails);
-          // Ensure timestamp exists, format if necessary
-          if (!parsedDetails.timestamp) {
-             parsedDetails.timestamp = format(new Date(), 'PPP p');
-          } else {
-             // Check if timestamp is ISO string, format if needed
-             try {
-               parsedDetails.timestamp = format(new Date(parsedDetails.timestamp), 'PPP p');
-             } catch {}
-          }
-          setOrderDetails(parsedDetails as OrderDetails);
-          console.log("Loaded order details:", parsedDetails);
-        } else {
-          console.warn("Could not find order details in localStorage for", orderId);
-          // Optionally set an error or default details
-        }
-      } catch (e) {
-        console.error("Error loading order details:", e);
-        setError("Failed to load order details.");
-      }
-    };
-
-    // Polling mechanism
-    let attempts = 0;
-    const maxAttempts = 60; // Poll for 60 seconds (60 * 1000ms)
-    const intervalMs = 1000;
-
-    const intervalId = setInterval(() => {
-      console.log(`Payment check attempt ${attempts + 1}/${maxAttempts}`);
-      const result = checkPaymentStatus();
-
-      if (result) {
-        console.log("Payment confirmed!");
-        clearInterval(intervalId);
-        setPaymentResult(result);
-        loadOrderDetails();
-        setIsLoading(false);
-        // Ensure payment is stored for future reference
-        localStorage.setItem(`payment_${orderId}`, JSON.stringify(result)); 
-      } else {
-        attempts++;
-        if (attempts >= maxAttempts) {
-          console.log("Max payment check attempts reached.");
-          clearInterval(intervalId);
-          // Even if payment isn't confirmed, try loading order details
-          loadOrderDetails(); 
-          setIsLoading(false);
-          // Optionally set an error if payment is expected but not found
-          // setError("Payment confirmation timed out.");
-        }
-      }
-    }, intervalMs);
-
-    // Immediate check
-    const initialResult = checkPaymentStatus();
-    if (initialResult) {
-      console.log("Payment confirmed immediately!");
-      clearInterval(intervalId);
-      setPaymentResult(initialResult);
-      loadOrderDetails();
-      setIsLoading(false);
-      localStorage.setItem(`payment_${orderId}`, JSON.stringify(initialResult));
+    // --- Step 1: Check URL parameters for txHash (Primary confirmation method) ---
+    if (urlTxHash) {
+      console.log(`Found txHash in URL: ${urlTxHash}`);
+      confirmedPayment = {
+        txHash: urlTxHash,
+        chainId: urlChainId ? parseInt(urlChainId, 10) : undefined
+      };
+      // Clean txHash/chainId from URL now that we've processed them
+      cleanUrlParams(['txHash', 'chainId']);
     } else {
-      // Load order details immediately even if payment pending
-      loadOrderDetails();
-      // Don't stop loading until payment confirmed or timeout
+      // --- Step 2: Fallback - Check localStorage (for same-device flow) ---
+      console.log("No txHash in URL, checking localStorage as fallback.");
+      try {
+        const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
+        if (storedPaymentResult) {
+          const parsedResult = JSON.parse(storedPaymentResult);
+          if (parsedResult.txHash) {
+            console.log("Found payment result in localStorage (fallback):", parsedResult);
+            confirmedPayment = parsedResult;
+          }
+        }
+      } catch (e) {
+        console.warn("Error parsing localStorage for payment:", e);
+      }
     }
 
-    return () => clearInterval(intervalId);
+    // --- Step 3: Set Payment State --- 
+    if (confirmedPayment) {
+      setPaymentResult(confirmedPayment);
+      console.log("Payment considered CONFIRMED.", confirmedPayment);
+      // Ensure it's stored locally even if confirmed via URL
+      localStorage.setItem(`payment_${orderId}`, JSON.stringify(confirmedPayment));
+    } else {
+      console.log("Payment NOT confirmed via URL or localStorage.");
+      // No payment confirmation found, will show 'Waiting for payment' state
+    }
 
-  }, [orderId, parsePaymentFromUrl]); // Only run when orderId changes
+    // --- Step 4: Load Order Details (Always attempt) ---
+    console.log("Attempting to load order details from localStorage...");
+    try {
+      const storedDetails = localStorage.getItem(orderId) || localStorage.getItem(`order_${orderId}`);
+      if (storedDetails) {
+        const parsedDetails = JSON.parse(storedDetails);
+        // Format timestamp
+        if (!parsedDetails.timestamp) {
+           parsedDetails.timestamp = format(new Date(), 'PPP p');
+        } else {
+           try { parsedDetails.timestamp = format(new Date(parsedDetails.timestamp), 'PPP p'); } catch {}
+        }
+        setOrderDetails(parsedDetails as OrderDetails);
+        console.log("Loaded order details from localStorage:", parsedDetails);
+      } else {
+        console.warn("Could not find order details in localStorage for", orderId);
+        if (confirmedPayment) {
+          // If payment is confirmed but details missing (e.g., QR scan)
+          setWarning("Payment confirmed, but order details could not be loaded on this device. Please refer to your original purchase device or receipt link.");
+        }
+      }
+    } catch (e) {
+      console.error("Error loading order details:", e);
+      setError("Failed to load order details data.");
+    }
+
+    // --- Step 5: Finalize Loading State --- 
+    setIsLoading(false);
+    console.log("Order Confirmation checks complete.");
+
+  }, [orderId, urlTxHash, urlChainId, setSearchParams]); // Re-run if key URL params change
 
   // Document title effect
   useEffect(() => {
@@ -219,18 +186,25 @@ const OrderConfirmation = () => {
     );
   }
 
-  // Render Confirmation Content
+  // Main Render Logic
   const isSuccess = paymentResult && paymentResult.txHash;
-  const receiptData = JSON.stringify({ orderId, paymentResult, orderDetails });
+
+  // Modify QR Code generation to include txHash and chainId
+  const generateQrUrl = () => {
+    const url = new URL(generateConfirmationUrl(orderId || ""));
+    if (paymentResult?.txHash) {
+      url.searchParams.set('txHash', paymentResult.txHash);
+    }
+    if (paymentResult?.chainId !== undefined) {
+      url.searchParams.set('chainId', String(paymentResult.chainId));
+    }
+    return url.toString();
+  };
+  const receiptQrValue = generateQrUrl();
   
-  // --- Debugging QR Code Value --- 
-  console.log("Order Confirmation - orderId:", orderId);
-  const confirmationPageUrl = generateConfirmationUrl(orderId || "");
-  console.log("Order Confirmation - generated confirmationPageUrl:", confirmationPageUrl);
-  const receiptQrValue = confirmationPageUrl;
-  console.log("Order Confirmation - receiptQrValue for QRCodeCanvas:", receiptQrValue);
-  // --- End Debugging ---
-  
+  // Log the final QR value
+  console.log("Final QR Code Value:", receiptQrValue);
+
   const yodlTxUrl = isSuccess ? `https://yodl.me/tx/${paymentResult.txHash}` : '';
 
   // Construct pre-filled Telegram message
@@ -320,6 +294,12 @@ const OrderConfirmation = () => {
                   )}
                 </div>
               </div>
+              
+              {warning && (
+                <div className="p-4 mb-4 bg-yellow-50 border border-yellow-200 rounded-lg text-center text-yellow-800">
+                  {warning}
+                </div>
+              )}
               
               {isSuccess ? (
                 <>

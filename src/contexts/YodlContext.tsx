@@ -79,7 +79,7 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
           // --- Broadcast a *standardized* message --- 
           try {
             const standardizedMessage = {
-              type: 'payment_complete', // ** Crucial: Use the standard type **
+              type: 'payment_complete', 
               txHash,
               chainId,
               orderId
@@ -128,7 +128,7 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
             // --- Broadcast the standardized message --- 
             try {
               const standardizedMessage = {
-                type: 'payment_complete', // ** Use the standard type **
+                type: 'payment_complete', 
                 txHash,
                 chainId,
                 orderId
@@ -245,7 +245,7 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         // --- Broadcast the standardized message --- 
         try {
           const standardizedMessage = {
-            type: 'payment_complete', // ** Use the standard type **
+            type: 'payment_complete', 
             txHash,
             chainId,
             orderId
