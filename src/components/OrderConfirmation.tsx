@@ -50,8 +50,27 @@ const OrderConfirmation = () => {
     window.history.replaceState({}, document.title, url.toString());
   };
 
+  // Add postMessage listener for payment completion
   useEffect(() => {
-    console.log("Confirmation Page - Raw URL Search Params:", window.location.search); // Log raw search params
+    const handleMessage = (event: MessageEvent) => {
+      // Verify the message is from Yodl or our own iframe
+      if (event.origin.includes('yodl.me') || event.origin === window.location.origin) {
+        if (event.data.type === 'payment_complete') {
+          const { txHash, chainId, orderId: messageOrderId } = event.data;
+          if (txHash && messageOrderId === orderId) {
+            setPaymentResult({ txHash, chainId });
+            setIsLoading(false);
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [orderId]);
+
+  useEffect(() => {
+    console.log("Confirmation Page - Raw URL Search Params:", window.location.search);
     
     // Try to parse payment information from URL (for redirect flow)
     const result = parsePaymentFromUrl();

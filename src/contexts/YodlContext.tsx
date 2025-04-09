@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import YappSDK, { FiatCurrency, isInIframe } from '@yodlpay/yapp-sdk';
 import adminConfig from '../config/admin.json';
+import { generateConfirmationUrl } from '../utils/url';
 
 interface YodlContextType {
   yodl: YappSDK;
@@ -40,6 +41,34 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
   // Get the merchant address from admin config
   const merchantAddress = adminConfig.admins[0]?.address || "";
   const merchantEns = adminConfig.admins[0]?.ens || "";
+
+  // Add postMessage listener for payment completion
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Verify the message is from Yodl
+      if (event.origin.includes('yodl.me')) {
+        if (event.data.type === 'payment_complete') {
+          const { txHash, chainId, orderId } = event.data;
+          if (txHash && orderId) {
+            // Store payment result
+            localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
+            // If we're in an iframe, notify parent window
+            if (isInIframeValue) {
+              window.parent.postMessage({
+                type: 'payment_complete',
+                txHash,
+                chainId,
+                orderId
+              }, '*');
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [isInIframeValue]);
 
   // Check for payment details in URL on initial load
   useEffect(() => {
@@ -94,19 +123,28 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         throw new Error("No merchant address or ENS configured in admin.json");
       }
       
-      // Always include redirectUrl (required in non-iframe mode)
-      // SDK will handle iframe mode automatically
-      const redirectUrl = params.redirectUrl || window.location.href;
+      // Handle redirect URL differently for iframe vs non-iframe
+      let redirectUrl = params.redirectUrl;
+      if (!redirectUrl) {
+        if (isInIframeValue) {
+          // In iframe mode, we want to stay in the iframe
+          redirectUrl = window.location.href;
+        } else {
+          // In non-iframe mode, use the confirmation URL
+          redirectUrl = generateConfirmationUrl(params.orderId);
+        }
+      }
       
       console.log('Requesting payment with params:', { 
         amount: params.amount, 
         currency: params.currency, 
         memo: params.orderId,
-        redirectUrl 
+        redirectUrl,
+        isInIframe: isInIframeValue
       });
       console.log('Using recipient:', recipientIdentifier);
       
-      // Pre-store order data in case the redirect happens before we can save it
+      // Pre-store order data
       try {
         const orderId = params.orderId;
         const orderData = {
@@ -122,12 +160,22 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         console.warn('Could not save order data to localStorage', e);
       }
       
-      return await yodl.requestPayment(recipientIdentifier, {
+      const paymentResult = await yodl.requestPayment(recipientIdentifier, {
         amount: params.amount,
         currency: params.currency as FiatCurrency,
         memo: params.orderId,
         redirectUrl: redirectUrl,
       });
+
+      // If we're in an iframe and got a payment result, store it
+      if (isInIframeValue && paymentResult?.txHash) {
+        localStorage.setItem(`payment_${params.orderId}`, JSON.stringify({
+          txHash: paymentResult.txHash,
+          chainId: paymentResult.chainId
+        }));
+      }
+
+      return paymentResult;
     } catch (error) {
       console.error('Error creating payment:', error);
       throw error;
