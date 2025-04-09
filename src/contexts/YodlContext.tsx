@@ -38,6 +38,9 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
   const [yodl] = useState(() => new YappSDK({}));
   const isInIframeValue = isInIframe();
   
+  // Detect if we're on a mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  
   // Get the merchant address from admin config
   const merchantAddress = adminConfig.admins[0]?.address || "";
   const merchantEns = adminConfig.admins[0]?.ens || "";
@@ -206,12 +209,18 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         }
       }
       
+      // For mobile devices, ensure the redirect URL uses the full origin to avoid iframe issues
+      if (isMobile && !redirectUrl.startsWith('http')) {
+        redirectUrl = new URL(redirectUrl, window.location.origin).toString();
+      }
+      
       console.log('Requesting payment with params:', { 
         amount: params.amount, 
         currency: params.currency, 
         memo: params.orderId,
         redirectUrl,
-        isInIframe: isInIframeValue
+        isInIframe: isInIframeValue,
+        isMobile
       });
       console.log('Using recipient:', recipientIdentifier);
       
@@ -231,6 +240,36 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         console.warn('Could not save order data to localStorage', e);
       }
       
+      // For mobile, set up a periodic check for completion in case the redirect fails
+      let mobileCheckInterval: number | null = null;
+      if (isMobile) {
+        mobileCheckInterval = window.setInterval(() => {
+          try {
+            console.log("Mobile payment check running...");
+            // 1. Check if we're already on the confirmation page
+            if (window.location.pathname.includes('confirmation')) {
+              if (mobileCheckInterval) clearInterval(mobileCheckInterval);
+              return;
+            }
+            
+            // 2. Check if payment completed
+            const storedPayment = localStorage.getItem(`payment_${params.orderId}`);
+            if (storedPayment) {
+              console.log("Mobile payment check found completed payment, redirecting");
+              if (mobileCheckInterval) clearInterval(mobileCheckInterval);
+              window.location.href = redirectUrl;
+            }
+          } catch (e) {
+            console.error("Error in mobile payment check:", e);
+          }
+        }, 2000); // Check every 2 seconds
+        
+        // Clear the interval after 2 minutes to prevent resource leaks
+        setTimeout(() => {
+          if (mobileCheckInterval) clearInterval(mobileCheckInterval);
+        }, 120000);
+      }
+      
       // Request payment - this will open Yodl UI
       const paymentResult = await yodl.requestPayment(recipientIdentifier, {
         amount: params.amount,
@@ -240,6 +279,11 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
       });
 
       console.log("Payment request completed with result:", paymentResult);
+
+      // Clean up the mobile check interval if it exists
+      if (mobileCheckInterval) {
+        clearInterval(mobileCheckInterval);
+      }
 
       // If we got a direct result with txHash, handle it
       if (paymentResult?.txHash) {
@@ -269,6 +313,14 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
           }
         } catch (e) {
           console.error("Error broadcasting direct payment completion:", e);
+        }
+        
+        // For mobile devices, force navigate to the confirmation page
+        if (isMobile) {
+          console.log("Mobile device detected with payment success, forcing navigation");
+          setTimeout(() => {
+            window.location.href = redirectUrl;
+          }, 500);
         }
       }
 

@@ -41,6 +41,9 @@ const Home = () => {
   const { openConnectModal } = useConnectModal();
   const { createPayment, isInIframe } = useYodl();
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
+  
+  // Detect if we're on a mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   const handleBuyNow = async (product: Product) => {
     console.log("[handleBuyNow] Clicked for:", product?.name);
@@ -81,6 +84,24 @@ const Home = () => {
         redirectUrl: confirmationUrl
       });
 
+      // For mobile devices, use a different approach
+      if (isMobile) {
+        console.log("[handleBuyNow] Mobile device detected, using mobile-specific flow");
+        
+        // Create a fallback timeout to check for payment completion
+        const mobileCheckTimeout = setTimeout(() => {
+          console.log("[handleBuyNow] Mobile payment check timeout fired");
+          const storedPayment = localStorage.getItem(`payment_${orderId}`);
+          if (storedPayment) {
+            console.log("[handleBuyNow] Found payment in localStorage, redirecting to confirmation");
+            window.location.href = confirmationUrl;
+          }
+        }, 5000); // Check after 5 seconds
+        
+        // Store the timeout ID in session storage for cleanup
+        sessionStorage.setItem('mobileCheckTimeoutId', String(mobileCheckTimeout));
+      }
+
       // In iframe mode, send a message to parent window about the order
       if (isInIframe) {
         try {
@@ -114,6 +135,16 @@ const Home = () => {
               iframe.style.touchAction = 'auto';
               iframe.style.zIndex = '10';
               
+              // For mobile devices, make sure iframe is absolutely visible
+              if (isMobile) {
+                iframe.style.position = 'fixed';
+                iframe.style.top = '0';
+                iframe.style.left = '0';
+                iframe.style.width = '100%';
+                iframe.style.height = '100%';
+                iframe.style.backgroundColor = '#ffffff';
+              }
+              
               // Ensure parent container has proper scrolling
               const parent = iframe.parentElement;
               if (parent) {
@@ -137,7 +168,8 @@ const Home = () => {
           productName: product.name,
           emoji: product.emoji
         },
-        redirectUrl: confirmationUrl
+        // For mobile devices, use _blank target to avoid iframe issues
+        redirectUrl: isMobile ? `${window.location.origin}/confirmation?orderId=${orderId}` : confirmationUrl
       });
       
       console.log('[handleBuyNow] createPayment call finished:', paymentResult);
@@ -151,6 +183,15 @@ const Home = () => {
           txHash: paymentResult.txHash,
           chainId: paymentResult.chainId
         }));
+        
+        // Clear any mobile timeout if it exists
+        if (isMobile) {
+          const timeoutId = sessionStorage.getItem('mobileCheckTimeoutId');
+          if (timeoutId) {
+            clearTimeout(parseInt(timeoutId));
+            sessionStorage.removeItem('mobileCheckTimeoutId');
+          }
+        }
         
         // In iframe mode, notify parent about completion
         if (isInIframe) {
@@ -171,6 +212,32 @@ const Home = () => {
         window.location.href = confirmationUrl;
       } else {
         console.log('[handleBuyNow] No immediate payment result, awaiting redirect or confirmation...');
+        
+        // For mobile, set up a periodic check for payment completion
+        if (isMobile) {
+          console.log("[handleBuyNow] Setting up mobile payment check interval");
+          const intervalId = setInterval(() => {
+            try {
+              const storedPayment = localStorage.getItem(`payment_${orderId}`);
+              if (storedPayment) {
+                console.log("[handleBuyNow] Found payment in interval check, redirecting to confirmation");
+                clearInterval(intervalId);
+                window.location.href = confirmationUrl;
+              }
+            } catch (e) {
+              console.error("[handleBuyNow] Error in mobile payment check interval:", e);
+            }
+          }, 2000); // Check every 2 seconds
+          
+          // Store the interval ID in session storage for cleanup
+          sessionStorage.setItem('mobileCheckIntervalId', String(intervalId));
+          
+          // Also set a timeout to clear the interval after a reasonable time
+          setTimeout(() => {
+            clearInterval(intervalId);
+            sessionStorage.removeItem('mobileCheckIntervalId');
+          }, 120000); // Clear after 2 minutes
+        }
       }
     } catch (error) {
       console.error('[handleBuyNow] Call to createPayment failed:', error);

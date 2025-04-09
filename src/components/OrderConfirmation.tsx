@@ -41,6 +41,9 @@ const OrderConfirmation = () => {
   const orderId = searchParams.get("orderId");
   const shop = shopConfig.shops[0];
   const shopTelegramHandle = shop?.telegramHandle;
+  
+  // Detect if we're on a mobile device
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
   // Helper function to clean payment parameters from URL
   const cleanPaymentUrl = () => {
@@ -49,6 +52,57 @@ const OrderConfirmation = () => {
     url.searchParams.delete('chainId');
     window.history.replaceState({}, document.title, url.toString());
   };
+
+  // Special handling for mobile - check payment status more aggressively
+  useEffect(() => {
+    if (!orderId || !isMobile) return;
+    
+    console.log("Mobile device detected - setting up aggressive payment checks");
+    
+    // On mobile, check payment status every second for 30 seconds
+    const mobileIntervalId = setInterval(() => {
+      try {
+        const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
+        
+        if (storedPaymentResult) {
+          const parsedResult = JSON.parse(storedPaymentResult);
+          
+          if (parsedResult.txHash) {
+            console.log("Mobile check found payment result:", parsedResult);
+            setPaymentResult(parsedResult);
+            setIsLoading(false);
+            clearInterval(mobileIntervalId);
+            
+            // Also load order details
+            const storedDetails = localStorage.getItem(`order_${orderId}`) || localStorage.getItem(orderId);
+            if (storedDetails) {
+              try {
+                const parsedDetails = JSON.parse(storedDetails);
+                setOrderDetails(parsedDetails as OrderDetails);
+              } catch (e) {
+                console.error("Error parsing stored order details:", e);
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error in mobile payment check:", e);
+      }
+    }, 1000);
+    
+    // Clear the interval after 30 seconds
+    setTimeout(() => {
+      clearInterval(mobileIntervalId);
+      
+      // If still loading, show content anyway to prevent blank screen
+      if (isLoading) {
+        console.log("Mobile timeout reached - showing content anyway");
+        setIsLoading(false);
+      }
+    }, 30000);
+    
+    return () => clearInterval(mobileIntervalId);
+  }, [orderId, isMobile, isLoading]);
 
   // More permissive postMessage listener that logs only relevant payment messages
   useEffect(() => {
