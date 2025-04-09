@@ -80,7 +80,27 @@ const Home = () => {
         orderId: orderId,
         redirectUrl: confirmationUrl
       });
-      await createPayment({
+
+      // In iframe mode, send a message to parent window about the order
+      if (isInIframe) {
+        try {
+          window.parent.postMessage({
+            type: 'order_started',
+            orderId: orderId,
+            product: {
+              name: product.name,
+              price: product.price,
+              currency: product.currency
+            }
+          }, '*');
+          
+          console.log("[handleBuyNow] Notified parent window about order start");
+        } catch (e) {
+          console.error("[handleBuyNow] Error notifying parent window:", e);
+        }
+      }
+
+      const paymentResult = await createPayment({
         amount: product.price,
         currency: product.currency,
         description: product.name,
@@ -88,14 +108,43 @@ const Home = () => {
         metadata: {
           productId: product.id,
           productName: product.name,
+          emoji: product.emoji
         },
         redirectUrl: confirmationUrl
       });
-      // If successful, redirect should occur. If it doesn't for some reason, 
-      // the loading state might remain stuck. We could add a timeout reset.
-      console.log('[handleBuyNow] createPayment call finished, awaiting redirect or confirmation...');
-      // Example timeout reset if needed:
-      // setTimeout(() => setIsProcessingPayment(null), 15000); 
+      
+      console.log('[handleBuyNow] createPayment call finished:', paymentResult);
+      
+      // If we get here and have a payment result with txHash, manually navigate to confirmation
+      if (paymentResult?.txHash) {
+        console.log('[handleBuyNow] Got immediate payment result with txHash:', paymentResult.txHash);
+        
+        // Store payment result in localStorage
+        localStorage.setItem(`payment_${orderId}`, JSON.stringify({
+          txHash: paymentResult.txHash,
+          chainId: paymentResult.chainId
+        }));
+        
+        // In iframe mode, notify parent about completion
+        if (isInIframe) {
+          try {
+            window.parent.postMessage({
+              type: 'payment_complete',
+              txHash: paymentResult.txHash,
+              chainId: paymentResult.chainId,
+              orderId: orderId
+            }, '*');
+            console.log("[handleBuyNow] Notified parent window about payment completion");
+          } catch (e) {
+            console.error("[handleBuyNow] Error notifying parent window about completion:", e);
+          }
+        }
+
+        // Navigate to confirmation page
+        window.location.href = confirmationUrl;
+      } else {
+        console.log('[handleBuyNow] No immediate payment result, awaiting redirect or confirmation...');
+      }
     } catch (error) {
       console.error('[handleBuyNow] Call to createPayment failed:', error);
       // Handle errors (e.g., user cancellation, timeout)

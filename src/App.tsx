@@ -6,6 +6,7 @@ import { mainnet, polygon, optimism, arbitrum, base, gnosis } from 'wagmi/chains
 import { YodlProvider, useYodl } from './contexts/YodlContext';
 import Home from "./components/home";
 import OrderConfirmation from "./components/OrderConfirmation";
+import PaymentBridge from "./components/PaymentBridge";
 import routes from "tempo-routes";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -39,6 +40,8 @@ function AppContent() {
   return (
     <Suspense fallback={<p>Loading...</p>}>
       <div className={`bg-background text-foreground min-h-screen ${isInIframe ? 'iframe-mode' : ''}`}>
+        <PaymentBridge />
+        
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/confirmation" element={<OrderConfirmation />} />

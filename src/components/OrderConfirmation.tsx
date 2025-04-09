@@ -50,15 +50,35 @@ const OrderConfirmation = () => {
     window.history.replaceState({}, document.title, url.toString());
   };
 
-  // Add postMessage listener for payment completion
+  // More permissive postMessage listener that logs all messages
   useEffect(() => {
+    console.log("Setting up message listener for payment completion");
+    
     const handleMessage = (event: MessageEvent) => {
-      // Verify the message is from Yodl or our own iframe
-      if (event.origin.includes('yodl.me') || event.origin === window.location.origin) {
-        if (event.data.type === 'payment_complete') {
-          const { txHash, chainId, orderId: messageOrderId } = event.data;
-          if (txHash && messageOrderId === orderId) {
+      // Log all incoming messages for debugging
+      console.log("Received message event:", event.origin, event.data);
+      
+      // Accept messages from any origin for maximum compatibility
+      if (event.data && typeof event.data === 'object') {
+        if (event.data.type === 'payment_complete' || 
+            (event.data.txHash && (event.data.orderId || event.data.memo))) {
+          console.log("Payment completion message detected:", event.data);
+          
+          // Extract data regardless of format
+          const txHash = event.data.txHash;
+          const chainId = event.data.chainId;
+          const messageOrderId = event.data.orderId || event.data.memo;
+          
+          // If we have transaction data and it matches our order (or we don't have an orderId to match)
+          if (txHash && (!orderId || messageOrderId === orderId || !messageOrderId)) {
+            console.log("Setting payment result from message:", { txHash, chainId });
             setPaymentResult({ txHash, chainId });
+            
+            // Store in localStorage for persistence
+            if (orderId) {
+              localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
+            }
+            
             setIsLoading(false);
           }
         }
@@ -69,6 +89,33 @@ const OrderConfirmation = () => {
     return () => window.removeEventListener('message', handleMessage);
   }, [orderId]);
 
+  // Periodically check for payment completion in localStorage
+  useEffect(() => {
+    if (!orderId || paymentResult) return; // Skip if no orderId or already have result
+    
+    console.log("Setting up periodic check for payment result");
+    
+    const checkInterval = setInterval(() => {
+      try {
+        const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
+        if (storedPaymentResult) {
+          const parsedResult = JSON.parse(storedPaymentResult);
+          if (parsedResult.txHash) {
+            console.log("Found payment result in localStorage during periodic check:", parsedResult);
+            setPaymentResult(parsedResult);
+            setIsLoading(false);
+            clearInterval(checkInterval);
+          }
+        }
+      } catch (e) {
+        console.error("Error checking for payment result:", e);
+      }
+    }, 1000); // Check every second
+    
+    return () => clearInterval(checkInterval);
+  }, [orderId, paymentResult]);
+
+  // Main data loading effect 
   useEffect(() => {
     console.log("Confirmation Page - Raw URL Search Params:", window.location.search);
     
