@@ -32,7 +32,7 @@ interface OrderDetails {
 
 const OrderConfirmation = () => {
   const [searchParams] = useSearchParams();
-  const { yodl, merchantAddress, merchantEns } = useYodl(); 
+  const { yodl, merchantAddress, merchantEns, isInIframe, parsePaymentFromUrl } = useYodl(); 
   const [paymentResult, setPaymentResult] = useState<PaymentResult | null>(null);
   const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -51,7 +51,9 @@ const OrderConfirmation = () => {
 
   useEffect(() => {
     console.log("Confirmation Page - Raw URL Search Params:", window.location.search); // Log raw search params
-    const result = yodl.parsePaymentFromUrl();
+    
+    // Try to parse payment information from URL (for redirect flow)
+    const result = parsePaymentFromUrl();
     console.log("Confirmation Page - Parsed URL Result:", JSON.stringify(result));
 
     let loadedOrderDetails: Partial<OrderDetails> | null = null;
@@ -59,7 +61,8 @@ const OrderConfirmation = () => {
     
     if (orderId) {
       try {
-        const storedDetails = localStorage.getItem(`order_${orderId}`);
+        // Look for order details in localStorage using the orderId both with and without prefix
+        const storedDetails = localStorage.getItem(`order_${orderId}`) || localStorage.getItem(orderId);
         const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
         
         if (storedDetails) {
@@ -118,23 +121,20 @@ const OrderConfirmation = () => {
       }
     }
     setIsLoading(false);
-  }, [yodl, orderId]);
+  }, [parsePaymentFromUrl, orderId]);
 
-  // Update localStorage key when loading order details
+  // Document title effect
   useEffect(() => {
-    if (orderId) {
-      try {
-        const storedDetails = localStorage.getItem(orderId);
-        if (storedDetails) {
-          // Migrate old storage format to new format
-          localStorage.setItem(`order_${orderId}`, storedDetails);
-          console.log("Migrated order details to new storage format");
-        }
-      } catch (e) {
-        console.error("Failed to migrate order details", e);
-      }
+    if (orderDetails) {
+      document.title = `Order Confirmation - ${orderDetails.name}`;
+    } else {
+      document.title = "Order Confirmation";
     }
-  }, [orderId]);
+    
+    return () => {
+      document.title = "Merchant Yapp";
+    };
+  }, [orderDetails]);
 
   if (isLoading) {
     return (

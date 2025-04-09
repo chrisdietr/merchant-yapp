@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 import { useYodl } from '../contexts/YodlContext';
 import { QRCodeCanvas } from 'qrcode.react';
+import { useNavigate } from 'react-router-dom';
 
 interface Product {
   id: string;
@@ -58,11 +59,12 @@ const CheckoutModal = ({
   shopConfig,
   onPayment,
 }: CheckoutModalProps) => {
+  const navigate = useNavigate();
   const [paymentStatus, setPaymentStatus] = useState<
     "pending" | "processing" | "success" | "failed"
   >("pending");
   const [progress, setProgress] = useState(0);
-  const { createPayment, merchantAddress, merchantEns } = useYodl();
+  const { createPayment, merchantAddress, merchantEns, isInIframe } = useYodl();
   const [orderId] = useState(`order_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
   
   // Reset payment status when modal opens and store product details
@@ -72,11 +74,12 @@ const CheckoutModal = ({
       setProgress(0);
       // Store product details for confirmation page
       try {
-        localStorage.setItem(orderId, JSON.stringify({
+        localStorage.setItem(`order_${orderId}`, JSON.stringify({
           name: product.name,
           price: product.price,
           currency: product.currency,
-          emoji: product.emoji
+          emoji: product.emoji,
+          timestamp: new Date().toISOString()
         }));
       } catch (e) {
         console.error("Failed to save order details to localStorage", e);
@@ -92,6 +95,8 @@ const CheckoutModal = ({
       // Generate a confirmation page URL
       const confirmationUrl = `${window.location.origin}/confirmation?orderId=${orderId}`;
       
+      console.log(`Starting payment${isInIframe ? ' (in iframe mode)' : ''}`);
+      
       const payment = await createPayment({
         amount: product.price,
         currency: product.currency,
@@ -100,24 +105,48 @@ const CheckoutModal = ({
         metadata: {
           productId: product.id,
           productName: product.name,
-          orderId: orderId
+          orderId: orderId,
+          emoji: product.emoji
         },
         redirectUrl: confirmationUrl
       });
 
       // If we get here without a redirect, the payment was successful in iframe mode
-      // Although this shouldn't happen in standalone mode, handle it just in case
+      console.log('Payment completed successfully in iframe mode:', payment);
+      
+      // Store the payment result in localStorage to retrieve on the confirmation page
+      try {
+        localStorage.setItem(`payment_${orderId}`, JSON.stringify({
+          txHash: payment.txHash,
+          chainId: payment.chainId
+        }));
+      } catch (e) {
+        console.error("Failed to save payment result to localStorage", e);
+      }
+      
       setProgress(100);
       setPaymentStatus("success");
+      
+      // Navigate to confirmation page after a brief delay to show success
+      setTimeout(() => {
+        navigate(`/confirmation?orderId=${orderId}`);
+        onClose();
+      }, 1500);
 
     } catch (error) {
       console.error('Payment failed:', error);
-      if (error.message !== 'Payment was cancelled') {
-         setPaymentStatus("failed");
-      } else {
-        // If cancelled, reset to pending
+      
+      // Handle specific error cases
+      if (error.message === 'Payment was cancelled') {
+        console.log('User cancelled the payment');
         setPaymentStatus("pending"); 
         setProgress(0);
+      } else if (error.message === 'Payment request timed out') {
+        console.log('Payment request timed out');
+        setPaymentStatus("failed");
+      } else {
+        // Handle other errors
+        setPaymentStatus("failed");
       }
     }
   };
@@ -174,22 +203,37 @@ const CheckoutModal = ({
 
         {paymentStatus === "pending" && (
           <div className="flex flex-col items-center gap-4">
-            <p className="text-sm text-muted-foreground text-center px-4">Scan or click the QR code to open the payment link in your wallet app.</p>
-            <button 
-              onClick={handleStartPayment} 
-              className="p-4 rounded-lg w-full max-w-[250px] h-auto aspect-square flex items-center justify-center transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-white dark:bg-gray-100"
-              aria-label="Start Payment with QR Code"
-            >
-              <QRCodeCanvas 
-                value={getPaymentLink()} 
-                size={200}
-                level={"H"}
-                includeMargin={false}
-                className="w-full h-full"
-                bgColor="#ffffff"
-                fgColor="#000000"
-              />
-            </button>
+            <p className="text-sm text-muted-foreground text-center px-4">
+              {isInIframe 
+                ? "Click the button below to start payment" 
+                : "Scan or click the QR code to open the payment link in your wallet app."
+              }
+            </p>
+            {isInIframe ? (
+              <Button
+                onClick={handleStartPayment}
+                className="w-full py-6 text-lg"
+                size="lg"
+              >
+                Pay with Crypto
+              </Button>
+            ) : (
+              <button 
+                onClick={handleStartPayment} 
+                className="p-4 rounded-lg w-full max-w-[250px] h-auto aspect-square flex items-center justify-center transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-white dark:bg-gray-100"
+                aria-label="Start Payment with QR Code"
+              >
+                <QRCodeCanvas 
+                  value={getPaymentLink()} 
+                  size={200}
+                  level={"H"}
+                  includeMargin={false}
+                  className="w-full h-full"
+                  bgColor="#ffffff"
+                  fgColor="#000000"
+                />
+              </button>
+            )}
           </div>
         )}
 
@@ -209,21 +253,8 @@ const CheckoutModal = ({
             <CheckCircle className="h-12 w-12 sm:h-16 sm:w-16 text-green-500" />
             <h3 className="text-lg sm:text-xl font-medium">Payment Successful!</h3>
             <p className="text-muted-foreground text-sm text-center px-4">
-              Your payment has been confirmed. You can close this modal.
+              Your payment has been confirmed. Redirecting to order confirmation...
             </p>
-            {shopConfig?.telegramHandle && (
-              <Button
-                className="mt-2"
-                variant="outline"
-                size="sm"
-                onClick={() => window.open(`https://t.me/${shopConfig.telegramHandle}`, "_blank")}
-              >
-                Contact Seller on Telegram
-              </Button>
-            )}
-            <Button onClick={onClose} className="mt-2" size="sm">
-              Return to Shop
-            </Button>
           </div>
         )}
 
