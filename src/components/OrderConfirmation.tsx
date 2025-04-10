@@ -151,11 +151,12 @@ const OrderConfirmation = () => {
     } else if (orderId) {
       document.title = `Order Status - ${orderId}`;
     } else {
-      document.title = "Order Status";
+      document.title = "Order Status"; // Keep this for when no orderId
     }
     
+    // Set the default title on cleanup
     return () => {
-      document.title = "Merchant Yapp";
+      document.title = "Merchant Yapp"; 
     };
   }, [orderDetails, orderId]);
 

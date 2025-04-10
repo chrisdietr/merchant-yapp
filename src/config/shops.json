@@ -11,7 +11,7 @@
       "name": "Shirt",
       "description": "Available in sizes S, M, L, XL, XXL",
       "price": 0.1,
-      "currency": "USD",
+      "currency": "CHF",
       "emoji": "👕",
       "inStock": true
     },
@@ -25,6 +25,15 @@
       "inStock": true
     },
     {
+      "id": "4",
+      "name": "Hat",
+      "description": "All sizes available.",
+      "price": 0.12,
+      "currency": "EUR",
+      "emoji": "👟",
+      "inStock": true
+    },
+    { 
       "id": "3",
       "name": "Beer",
       "description": "Infinite stock.",
