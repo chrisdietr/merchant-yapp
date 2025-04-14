@@ -1,7 +1,7 @@
 {
   "name": "starter",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -64,7 +64,7 @@
     "vaul": "^0.9.1",
     "viem": "^2.26.1",
     "wagmi": "^2.14.16",
-    "zod": "^3.23.8"
+    "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^20.14.2",

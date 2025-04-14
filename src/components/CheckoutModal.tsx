@@ -9,7 +9,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -17,48 +16,26 @@ import {
   XCircle,
   Loader2,
   ExternalLink,
-  Copy,
+  User,
 } from "lucide-react";
 import { useYodl } from '../contexts/YodlContext';
-import { QRCodeCanvas } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { generateConfirmationUrl } from "@/utils/url";
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  currency: string;
-  emoji: string;
-}
+import { Product } from '../config/config';
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface CheckoutModalProps {
-  isOpen?: boolean;
-  onClose?: () => void;
-  product?: Product;
-  walletAddress?: string;
-  shopConfig?: {
-    name: string;
-    telegramHandle?: string;
-  };
-  onPayment?: (product: Product) => Promise<void>;
+  isOpen: boolean;
+  onClose: () => void;
+  product: Product | null;
+  onCheckout?: (product: Product, quantity: number) => Promise<void>;
 }
 
 const CheckoutModal = ({
-  isOpen = true,
-  onClose = () => {},
-  product = {
-    id: "1",
-    name: "Coffee",
-    description: "Freshly brewed",
-    price: 2.5,
-    currency: "CHF",
-    emoji: "☕",
-  },
-  walletAddress,
-  shopConfig,
-  onPayment,
+  isOpen,
+  onClose,
+  product,
 }: CheckoutModalProps) => {
   const navigate = useNavigate();
   const [paymentStatus, setPaymentStatus] = useState<
@@ -66,14 +43,13 @@ const CheckoutModal = ({
   >("pending");
   const [progress, setProgress] = useState(0);
   const { createPayment, merchantAddress, merchantEns, isInIframe } = useYodl();
-  const [orderId] = useState(`order_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+  const [orderId] = useState(() => `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
+  const [userName, setUserName] = useState("");
   
-  // Reset payment status when modal opens and store product details
   useEffect(() => {
     if (isOpen && product) {
       setPaymentStatus("pending");
       setProgress(0);
-      // Store product details for confirmation page
       try {
         localStorage.setItem(`order_${orderId}`, JSON.stringify({
           name: product.name,
@@ -85,83 +61,81 @@ const CheckoutModal = ({
       } catch (e) {
         console.error("Failed to save order details to localStorage", e);
       }
+    } else if (!isOpen) {
+      setPaymentStatus("pending");
+      setProgress(0);
     }
   }, [isOpen, product, orderId]);
 
   const handleStartPayment = async () => {
     if (!product) return;
     setPaymentStatus("processing");
+    setProgress(10);
+
+    // Format userName for inclusion in memo if provided
+    const formattedOrderId = userName.trim() 
+      ? `${orderId}_${userName.trim().replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30)}`
+      : orderId;
 
     try {
-      // Generate a confirmation page URL
       const confirmationUrl = generateConfirmationUrl(orderId);
-      
-      console.log(`Starting payment${isInIframe ? ' (in iframe mode)' : ''}`);
-      
+      console.log(`Starting payment for order ${formattedOrderId}${isInIframe ? ' (in iframe mode)' : ''}`);
+
       const payment = await createPayment({
         amount: product.price,
         currency: product.currency,
         description: product.name,
-        orderId: orderId,
+        orderId: formattedOrderId, // Use formatted order ID with user name
         metadata: {
           productId: product.id,
           productName: product.name,
-          orderId: orderId,
-          emoji: product.emoji
+          orderId: orderId, // Keep original order ID in metadata
+          customerName: userName.trim(), // Add customer name to metadata
+          emoji: product.emoji,
+          quantity: "1"
         },
         redirectUrl: confirmationUrl
       });
 
-      // If we get here without a redirect, the payment was successful in iframe mode
-      console.log('Payment completed successfully in iframe mode:', payment);
-      
-      // Store the payment result in localStorage to retrieve on the confirmation page
-      try {
-        localStorage.setItem(`payment_${orderId}`, JSON.stringify({
-          txHash: payment.txHash,
-          chainId: payment.chainId
-        }));
-      } catch (e) {
-        console.error("Failed to save payment result to localStorage", e);
-      }
-      
-      setProgress(100);
-      setPaymentStatus("success");
-      
-      // Navigate to confirmation page after a brief delay to show success
-      setTimeout(() => {
-        navigate(`/confirmation?orderId=${orderId}`);
-        onClose();
-      }, 1500);
+      console.log('Payment request successful (or redirect initiated):', payment);
 
-    } catch (error) {
+      if (isInIframe && payment?.txHash) {
+        try {
+          localStorage.setItem(`payment_${orderId}`, JSON.stringify({
+            txHash: payment.txHash,
+            chainId: payment.chainId
+          }));
+        } catch (e) {
+          console.error("Failed to save iframe payment result to localStorage", e);
+        }
+        setProgress(100);
+        setPaymentStatus("success");
+        setTimeout(() => {
+          navigate(`/confirmation?orderId=${orderId}`);
+          onClose();
+        }, 1500);
+      } else if (!isInIframe) {
+        setPaymentStatus("processing");
+        setProgress(50);
+      } else {
+        console.warn("Payment initiated, but no immediate txHash in iframe mode.");
+        setPaymentStatus("processing");
+        setProgress(30);
+      }
+
+    } catch (error: any) {
       console.error('Payment failed:', error);
-      
-      // Handle specific error cases
-      if (error.message === 'Payment was cancelled') {
+      if (error.message?.includes('cancelled') || error.code === 4001) {
         console.log('User cancelled the payment');
-        setPaymentStatus("pending"); 
-        setProgress(0);
-      } else if (error.message === 'Payment request timed out') {
+        setPaymentStatus("pending");
+      } else if (error.message?.includes('timed out')) {
         console.log('Payment request timed out');
         setPaymentStatus("failed");
       } else {
-        // Handle other errors
         setPaymentStatus("failed");
       }
+      setProgress(0);
     }
-  };
-
-  // Generate the direct payment link (still useful for QR code data)
-  const getPaymentLink = () => {
-    if (!product) return '';
-    const identifier = merchantEns || merchantAddress;
-    const confirmationUrl = encodeURIComponent(generateConfirmationUrl(orderId));
-    return `https://yodl.me/${identifier}?amount=${product.price}&currency=${product.currency}&redirectUrl=${confirmationUrl}`;
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(getPaymentLink());
   };
 
   return (
@@ -172,9 +146,9 @@ const CheckoutModal = ({
             <span>{product?.emoji}</span>
             <span>Checkout</span>
           </DialogTitle>
-          {!isInIframe && (
+          {!isInIframe && product && (
             <DialogDescription>
-              Complete your purchase using cryptocurrency via Yodl.
+              {product.description}
             </DialogDescription>
           )}
         </DialogHeader>
@@ -185,17 +159,11 @@ const CheckoutModal = ({
               <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
                 <div>
                   <h3 className="font-medium text-lg">{product?.name}</h3>
-                  <p className="text-muted-foreground text-sm">
-                    {product?.description}
-                  </p>
                 </div>
                 <div className="text-right shrink-0">
                   <p className="font-bold text-lg">
                     {product?.price} {product?.currency}
                   </p>
-                  <Badge className="mt-1">
-                    Crypto Payment
-                  </Badge>
                 </div>
               </div>
             </CardContent>
@@ -203,40 +171,36 @@ const CheckoutModal = ({
         </div>
 
         <Separator className="my-4" />
+        
+        {/* Add user name input field */}
+        <div className="mb-4">
+          <Label htmlFor="userName" className="text-sm font-medium">
+            Your Name
+          </Label>
+          <div className="flex items-center mt-1.5">
+            <User className="w-4 h-4 mr-2 text-muted-foreground" />
+            <Input
+              id="userName"
+              placeholder="Enter your name (optional)"
+              value={userName}
+              onChange={(e) => setUserName(e.target.value)}
+              className="flex-1"
+            />
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Your name will be included in the transaction memo to help the seller identify your purchase
+          </p>
+        </div>
 
         {paymentStatus === "pending" && (
-          <div className="flex flex-col items-center gap-4">
-            <p className="text-sm text-muted-foreground text-center px-4">
-              {isInIframe 
-                ? "Click the button below to start payment" 
-                : "Scan or click the QR code to open the payment link in your wallet app."
-              }
-            </p>
-            {isInIframe ? (
-              <Button
-                onClick={handleStartPayment}
-                className="w-full py-6 text-lg"
-                size="lg"
-              >
-                Pay with Crypto
-              </Button>
-            ) : (
-              <button 
-                onClick={handleStartPayment} 
-                className="p-4 rounded-lg w-full max-w-[250px] h-auto aspect-square flex items-center justify-center transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 bg-white dark:bg-gray-100"
-                aria-label="Start Payment with QR Code"
-              >
-                <QRCodeCanvas 
-                  value={getPaymentLink()} 
-                  size={200}
-                  level={"H"}
-                  includeMargin={false}
-                  className="w-full h-full"
-                  bgColor="#ffffff"
-                  fgColor="#000000"
-                />
-              </button>
-            )}
+          <div className="flex flex-col items-center">
+            <Button
+              onClick={handleStartPayment}
+              className="w-full py-6 text-lg font-medium"
+              size="lg"
+            >
+              Pay
+            </Button>
           </div>
         )}
 
@@ -246,7 +210,7 @@ const CheckoutModal = ({
             <h3 className="text-lg sm:text-xl font-medium">Processing Payment</h3>
             <Progress value={progress} className="w-full max-w-xs" />
             <p className="text-muted-foreground text-sm text-center px-4">
-              Please wait while we confirm your transaction on the blockchain.
+              {isInIframe ? 'Waiting for confirmation...' : 'Please complete the payment in your wallet or on the Yodl page.'}
             </p>
           </div>
         )}
@@ -256,40 +220,24 @@ const CheckoutModal = ({
             <CheckCircle className="h-12 w-12 sm:h-16 sm:w-16 text-green-500" />
             <h3 className="text-lg sm:text-xl font-medium">Payment Successful!</h3>
             <p className="text-muted-foreground text-sm text-center px-4">
-              Your payment has been confirmed. Redirecting to order confirmation...
+              Your transaction is confirmed. Redirecting soon...
             </p>
           </div>
         )}
 
         {paymentStatus === "failed" && (
           <div className="flex flex-col items-center gap-4 py-6">
-            <XCircle className="h-12 w-12 sm:h-16 sm:w-16 text-destructive" />
+            <XCircle className="h-12 w-12 sm:h-16 sm:w-16 text-red-500" />
             <h3 className="text-lg sm:text-xl font-medium">Payment Failed</h3>
             <p className="text-muted-foreground text-sm text-center px-4">
-              There was an issue processing your payment. Please try again.
+              Something went wrong. Please try again.
             </p>
-            <div className="flex gap-2 w-full max-w-xs mt-2">
-              <Button
-                className="flex-1"
-                size="sm"
-                onClick={() => setPaymentStatus("pending")}
-              >
-                Try Again
-              </Button>
-              <Button
-                onClick={onClose}
-                variant="outline"
-                size="sm"
-                className="flex-1"
-              >
-                Cancel
-              </Button>
-            </div>
+            <Button onClick={handleStartPayment} variant="outline">Try Again</Button>
           </div>
         )}
 
         <DialogFooter className="mt-4 sm:mt-6">
-          {/* Footer buttons removed/simplified as main action is QR click */}
+          <Button variant="outline" onClick={onClose}>Close</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

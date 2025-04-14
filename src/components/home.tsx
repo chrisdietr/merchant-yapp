@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useContext, useState, useEffect } from "react";
 import { useAccount, useDisconnect } from 'wagmi';
 import { ConnectButton, useConnectModal } from '@rainbow-me/rainbowkit';
 import { useYodl } from '../contexts/YodlContext';
@@ -13,27 +13,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Wallet } from "lucide-react";
 import ProductCard from "./ProductCard";
-import shopConfig from "../config/shops.json";
+import { shopConfig, Product, adminConfig } from "../config/config";
 import ThemeToggle from './ThemeToggle';
 import { generateConfirmationUrl } from "@/utils/url";
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  currency: string;
-  emoji: string;
-  inStock: boolean | string;
-}
-
-interface ShopConfig {
-  shops: {
-    name: string;
-    telegramHandle?: string;
-  }[];
-  products: Product[];
-}
+import CheckoutModal from "./CheckoutModal";
+import { useToast } from "./ui/use-toast";
+import useDeviceDetection from "../hooks/useMediaQuery";
 
 const Home = () => {
   const { address, isConnected } = useAccount();
@@ -41,9 +26,12 @@ const Home = () => {
   const { openConnectModal } = useConnectModal();
   const { createPayment, isInIframe } = useYodl();
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
+  const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const { toast } = useToast();
   
-  // Detect if we're on a mobile device
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  // Use our media query-based detection instead
+  const { isMobile, isTouch } = useDeviceDetection();
 
   const handleBuyNow = async (product: Product) => {
     console.log("[handleBuyNow] Clicked for:", product?.name);
@@ -118,7 +106,7 @@ const Home = () => {
               iframe.style.zIndex = '10';
               
               // For mobile devices, make sure iframe is absolutely visible
-              if (isMobile) {
+              if (isMobile || isTouch) {
                 iframe.style.position = 'fixed';
                 iframe.style.top = '0';
                 iframe.style.left = '0';
@@ -206,56 +194,92 @@ const Home = () => {
     }
   };
 
-  const { shops, products } = shopConfig as ShopConfig;
-  const shop = shops[0];
+  const handleOpenCheckoutModal = (product: Product) => {
+    if (product && product.id) {
+      setSelectedProduct(product);
+      setIsCheckoutModalOpen(true);
+    } else {
+      console.error("Attempted to open checkout modal with invalid product:", product);
+      toast({ title: "Error", description: "Cannot select this product.", variant: "destructive" });
+    }
+  };
+
+  const handleCloseCheckoutModal = () => {
+    setIsCheckoutModalOpen(false);
+    setSelectedProduct(null);
+  };
 
   return (
-    <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-purple-900 dark:via-indigo-900 dark:to-purple-800">
+    <div className="container mx-auto px-4 py-8 flex flex-col min-h-screen">
       <header className={`sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50 ${isInIframe ? 'py-2' : 'py-3'}`}>
         <div className="container mx-auto px-4 flex flex-wrap justify-between items-center sm:flex-nowrap">
-          {/* Title Wrapper: Hide in iframe mode */}
           {!isInIframe && (
             <div className="w-full text-center order-1 sm:w-auto sm:text-left sm:order-none">
-              <h1 className="text-xl sm:text-2xl font-bold truncate inline-block">{shop.name}</h1> 
+              <h1 className="text-xl sm:text-2xl font-bold truncate inline-block">{shopConfig.shops[0].name}</h1> 
             </div>
           )}
-          {/* Button Group Wrapper: Full width in iframe mode */}
           <div className={`${isInIframe ? 'w-full' : 'w-full sm:w-auto'} flex justify-end order-2 sm:order-none`}>
             <div className="flex items-center gap-2 sm:gap-4">
               <ThemeToggle />
-              <ConnectButton 
-                chainStatus="none" 
-                accountStatus="avatar"
-              /> 
+              {isConnected ? (
+                <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded"> 
+                  <Wallet size={16} />
+                  <span className="text-sm font-medium">{address?.substring(0, 6)}...{address?.substring(address.length - 4)}</span>
+                </div>
+              ) : (
+                <Button onClick={handleConnectWallet}>Connect Wallet</Button>
+              )}
             </div>
           </div>
         </div>
       </header>
 
-      {/* Further constrain max width */}
-      <main className="container mx-auto px-4 py-8 max-w-6xl">
-        <section className="mb-8">
+      <main className="flex-grow">
+        <section>
           <h2 className="text-3xl font-bold mb-6 text-center sm:text-left">Products</h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                id={product.id}
-                name={product.name}
-                description={product.description}
-                price={product.price}
-                currency={product.currency}
-                emoji={product.emoji}
-                inStock={product.inStock}
-                onCheckout={handleBuyNow}
-                isWalletConnected={isConnected}
-                onConnectWallet={handleConnectWallet}
-              />
-            ))}
-          </div>
+          {isConnected ? (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                {shopConfig.products.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    id={product.id}
+                    name={product.name}
+                    description={product.description}
+                    price={product.price}
+                    currency={product.currency}
+                    emoji={product.emoji}
+                    inStock={product.inStock}
+                    onCheckout={handleOpenCheckoutModal}
+                    isWalletConnected={isConnected}
+                    onConnectWallet={handleConnectWallet}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="text-center py-10 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <Wallet size={48} className="mx-auto mb-4 text-gray-400" />
+              <p className="mb-4 text-lg font-semibold">Connect Your Wallet</p>
+              <p className="mb-6 text-gray-600 dark:text-gray-400">Please connect your wallet to view and purchase products.</p>
+              <Button onClick={handleConnectWallet} size="lg">Connect Wallet</Button>
+            </div>
+          )}
         </section>
       </main>
+
+      {selectedProduct && (
+        <CheckoutModal
+          isOpen={isCheckoutModalOpen}
+          onClose={handleCloseCheckoutModal}
+          product={selectedProduct}
+        />
+      )}
+
+      <footer className="mt-8 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+        Powered by YODL
+      </footer>
     </div>
   );
 };

@@ -10,17 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Wallet } from "lucide-react";
-
-// Define Product type locally
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  currency: string;
-  emoji: string;
-  inStock: boolean | string;
-}
+import { Product } from '../config/config'; // Import shared Product type
 
 interface ProductCardProps {
   id: string;
@@ -29,35 +19,35 @@ interface ProductCardProps {
   price: number;
   currency: string;
   emoji: string;
-  inStock: boolean | string;
+  inStock: boolean | "infinite";
   onCheckout: (product: Product) => void;
   isWalletConnected?: boolean;
   onConnectWallet?: () => void;
 }
 
 const ProductCard = ({
-  id = "1",
-  name = "Product Name",
-  description = "Product description goes here. This is a placeholder for the actual product description.",
-  price = 9.99,
-  currency = "USD",
-  emoji = "🛍️",
-  inStock = true,
-  onCheckout = () => {},
+  id,
+  name,
+  description,
+  price,
+  currency,
+  emoji,
+  inStock,
+  onCheckout,
   isWalletConnected = false,
   onConnectWallet = () => {},
 }: ProductCardProps) => {
   const productData: Product = { id, name, description, price, currency, emoji, inStock };
 
   const handleCheckout = () => {
-    if (isWalletConnected) {
+    if (isWalletConnected && isAvailable) {
       onCheckout(productData);
-    } else {
+    } else if (!isWalletConnected) {
       onConnectWallet();
     }
   };
 
-  const isAvailable = inStock === true || inStock === "infinite" || inStock === "true";
+  const isAvailable = inStock === true || inStock === "infinite";
 
   return (
     <Card className="w-full max-w-sm overflow-hidden transition-all duration-200 hover:shadow-lg bg-card dark:bg-card/80 flex flex-col">
@@ -84,7 +74,7 @@ const ProductCard = ({
           onClick={handleCheckout}
           className={`w-full ${isWalletConnected && isAvailable ? 'bg-purple-700 hover:bg-purple-800 dark:bg-purple-600 dark:hover:bg-purple-700 text-white' : ''}`}
           disabled={!isAvailable}
-          variant={isWalletConnected ? "default" : "outline"}
+          variant={isWalletConnected && isAvailable ? "default" : "outline"}
         >
           {!isAvailable ? (
             "Sold Out"

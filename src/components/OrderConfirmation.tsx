@@ -10,13 +10,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, Download, Home, Loader2, ExternalLink, Send, XCircle } from "lucide-react";
+import { CheckCircle, Home, Loader2, ExternalLink, Send, XCircle } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { format } from 'date-fns';
 import { QRCodeCanvas } from 'qrcode.react';
-import shopConfig from "../config/shops.json";
+import { shopConfig, Product } from '../config/config';
 import ThemeToggle from "./ThemeToggle";
 import { generateConfirmationUrl } from "@/utils/url";
+import useDeviceDetection from "../hooks/useMediaQuery";
 
 interface PaymentResult {
   txHash?: string | null; 
@@ -39,6 +40,7 @@ const OrderConfirmation = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
+  const [orderedProduct, setOrderedProduct] = useState<Product | null>(null);
   
   const orderId = searchParams.get("orderId");
   const urlTxHash = searchParams.get("txHash");
@@ -47,8 +49,8 @@ const OrderConfirmation = () => {
   const shop = shopConfig.shops[0];
   const shopTelegramHandle = shop?.telegramHandle;
   
-  // Detect if we're on a mobile device
-  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  // Use our media query-based detection instead
+  const { isMobile, isTouch } = useDeviceDetection();
 
   // Helper function to clean specific parameters from URL without reload
   const cleanUrlParams = (paramsToRemove: string[]) => {
@@ -126,6 +128,9 @@ const OrderConfirmation = () => {
         }
         setOrderDetails(parsedDetails as OrderDetails);
         console.log("Loaded order details from localStorage:", parsedDetails);
+        if (parsedDetails) {
+          setOrderedProduct(parsedDetails as Product);
+        }
       } else {
         console.warn("Could not find order details in localStorage for", orderId);
         if (confirmedPayment) {
@@ -350,11 +355,6 @@ const OrderConfirmation = () => {
                 Contact Seller
               </Button>
             )}
-            
-            <Button variant="outline" size="sm" onClick={() => window.print()}>
-              <Download className="mr-2 h-4 w-4" />
-              Save as PDF
-            </Button>
           </CardFooter>
         </Card>
 

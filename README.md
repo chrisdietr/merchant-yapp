@@ -12,6 +12,7 @@ A decentralized point-of-sale application with crypto payments built with React,
 - **Order Confirmations**: Clean, shareable receipts with product details and QR codes
 - **Telegram Integration**: Direct customer communication with transaction receipts
 - **Inventory Management**: Support for in-stock, out-of-stock, and unlimited inventory
+- **Environment-Based Configuration**: Easy setup with environment variables
 
 ## Quick Start
 
@@ -40,6 +41,7 @@ yarn install
 3. Configure your environment:
    - Copy `.env.example` to `.env`
    - Add your WalletConnect Project ID from [WalletConnect Cloud](https://cloud.walletconnect.com/)
+   - Configure your admin and shop settings (see Configuration section below)
 
 4. Start the development server:
 ```bash
@@ -52,46 +54,34 @@ yarn dev
 
 ## Configuration
 
+The app is configured using environment variables. These can be set in your `.env` file for local development or through your hosting service for production.
+
 ### Step 1: Configure Your Admin Wallet
 
-1. Open `src/config/admin.json` and configure your wallet:
+Add the following to your `.env` file:
 
-```json
-{
-  "admins": [
-    {
-      "ens": "YOUR_ENS_NAME.eth",
-      "address": "0xYOUR_WALLET_ADDRESS"
-    }
-  ]
-}
 ```
+VITE_ADMIN_CONFIG={"admins":[{"ens":"YOUR_ENS_NAME.eth","address":"0xYOUR_WALLET_ADDRESS"}]}
+```
+
+This JSON string contains:
+- `admins`: An array of admin wallets
+  - `ens`: Your ENS name (optional if address is provided)
+  - `address`: Your Ethereum wallet address (optional if ENS is provided)
 
 ### Step 2: Configure Your Shop
 
-1. Open `src/config/shops.json` and customize your shop information:
+Add the following to your `.env` file:
 
-```json
-{
-  "shops": [
-    {
-      "name": "Your Shop Name",
-      "telegramHandle": "your_telegram_handle"
-    }
-  ],
-  "products": [
-    {
-      "id": "1",
-      "name": "T-Shirt",
-      "description": "Premium cotton t-shirt",
-      "price": 0.1,
-      "currency": "USD",
-      "emoji": "👕",
-      "inStock": true
-    }
-  ]
-}
 ```
+VITE_SHOP_CONFIG={"shops":[{"name":"Your Shop Name","telegramHandle":"your_telegram_handle"}],"products":[{"id":"1","name":"T-Shirt","description":"Premium cotton t-shirt","price":0.1,"currency":"USD","emoji":"👕","inStock":true}]}
+```
+
+This JSON string contains:
+- `shops`: An array of shop configurations
+  - `name`: Your shop name
+  - `telegramHandle`: Your Telegram handle for customer communication
+- `products`: An array of products with the following fields:
 
 ## Product Configuration Options
 
@@ -105,6 +95,14 @@ yarn dev
 | emoji | Visual representation | "☕", "👕", "🧢" |
 | inStock | Availability status | true, false, "infinite" |
 
+### Environment Configuration Security
+
+The configuration uses Zod for validation and will throw an error if the configuration is invalid. This ensures that:
+
+1. All required fields are present
+2. Field types are correct
+3. Array requirements are met (e.g., at least one admin is configured)
+
 ## Deployment
 
 To deploy your application:
@@ -117,7 +115,10 @@ yarn build
 ```
 
 2. The build output will be in the `dist` directory
-3. Deploy this directory to your web hosting service
+3. Set the required environment variables in your hosting platform
+4. Deploy this directory to your web hosting service
+
+See `DEPLOYMENT.md` for detailed deployment instructions, including Vercel and Docker deployment options.
 
 ## License
 
