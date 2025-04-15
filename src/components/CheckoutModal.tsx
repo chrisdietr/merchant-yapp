@@ -94,6 +94,30 @@ const CheckoutModal = ({
       const confirmationUrl = generateConfirmationUrl(orderId);
       console.log(`Starting payment for order ${finalOrderId}${isInIframe ? ' (in iframe mode)' : ''}`);
 
+      // Set up a listener for payment completion messages
+      const messageHandler = (event: MessageEvent) => {
+        const data = event.data;
+        
+        // Check for payment completion message
+        if (data && typeof data === 'object' && data.type === 'payment_complete' && data.orderId === orderId) {
+          console.log('Received payment completion message:', data);
+          setProgress(100);
+          setPaymentStatus("success");
+          
+          // Navigate to confirmation screen
+          setTimeout(() => {
+            navigate(`/confirmation?orderId=${orderId}`);
+            onClose();
+          }, 1500);
+          
+          // Remove listener once payment is detected
+          window.removeEventListener('message', messageHandler);
+        }
+      };
+      
+      // Add listener for payment completion
+      window.addEventListener('message', messageHandler);
+
       const payment = await createPayment({
         amount: product.price,
         currency: product.currency,
@@ -123,15 +147,25 @@ const CheckoutModal = ({
         }
         setProgress(100);
         setPaymentStatus("success");
-        setTimeout(() => {
-          navigate(`/confirmation?orderId=${orderId}`);
-          onClose();
-        }, 1500);
+        
+        // If we're in iframe mode, navigate to confirmation page
+        // For direct mode, the YodlContext will handle redirection
+        if (isInIframe) {
+          setTimeout(() => {
+            navigate(`/confirmation?orderId=${orderId}`);
+            onClose();
+          }, 1500);
+        }
       } else {
         // In redirect flow (or payment not immediately confirmed)
         setPaymentStatus("processing");
         setProgress(50);
       }
+      
+      // Clean up message listener if payment wasn't immediate
+      return () => {
+        window.removeEventListener('message', messageHandler);
+      };
 
     } catch (error: any) {
       console.error('Payment failed:', error);

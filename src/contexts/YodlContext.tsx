@@ -228,6 +228,10 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
       } catch (e) {
         console.warn('Could not save order data to localStorage', e);
       }
+      
+      if (isInIframeValue) {
+        console.log(`Handling iframe payment for ${recipientIdentifier}`);
+      }
             
       // Request payment using SDK
       const paymentResult = await yodl.requestPayment({
@@ -271,6 +275,16 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         } catch (e) {
           console.error("Error broadcasting payment message:", e);
         }
+        
+        // For iframe mode, return the result without navigation
+        if (isInIframeValue) {
+          return paymentResult;
+        }
+        
+        // For non-iframe mode, redirect to confirmation page
+        setTimeout(() => {
+          window.location.href = redirectUrl;
+        }, 200);
       }
 
       return paymentResult;

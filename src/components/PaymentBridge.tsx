@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { generateConfirmationUrl } from '@/utils/url';
+import { useYodl } from '../contexts/YodlContext';
 
 /**
  * This component acts as a global listener for payment completion signals.
@@ -8,6 +9,8 @@ import { generateConfirmationUrl } from '@/utils/url';
  */
 const PaymentBridge: React.FC = () => {
   const navigate = useNavigate();
+  const { isInIframe } = useYodl();
+  
   // Use ref to ensure the navigate function used in the listener is up-to-date
   const navigateRef = useRef(navigate);
   useEffect(() => { navigateRef.current = navigate; }, [navigate]);
@@ -46,6 +49,23 @@ const PaymentBridge: React.FC = () => {
           const currentOrderId = currentSearchParams.get('orderId');
           const currentTxHash = currentSearchParams.get('txHash');
 
+          // If in iframe mode, notify parent window of payment completion
+          if (isInIframe && window.parent) {
+            try {
+              const parentMessage = {
+                type: 'yapp_payment_complete',
+                txHash,
+                chainId,
+                orderId,
+                confirmation_url: window.location.origin + fullConfirmationPath
+              };
+              window.parent.postMessage(parentMessage, '*');
+              console.log('PaymentBridge: Notified parent window of payment completion');
+            } catch (e) {
+              console.error('PaymentBridge: Error notifying parent window:', e);
+            }
+          }
+
           // Only navigate if we are not already on the confirmation page for this specific tx
           if (!(currentPath.includes('/confirmation') && currentOrderId === orderId && currentTxHash === txHash)) {
              console.log(`PaymentBridge: Navigating to full confirmation page: ${fullConfirmationPath}`);
@@ -68,12 +88,23 @@ const PaymentBridge: React.FC = () => {
     console.log("PaymentBridge: Adding message listener.");
     window.addEventListener('message', handleMessage);
 
+    // Handle Yodl iframe specific communication
+    if (isInIframe) {
+      // Let parent know this app is ready to handle payments
+      try {
+        window.parent.postMessage({ type: 'yapp_ready' }, '*');
+        console.log('PaymentBridge: Notified parent window that Yapp is ready');
+      } catch (e) {
+        console.error('PaymentBridge: Error notifying parent window of readiness:', e);
+      }
+    }
+
     // Cleanup
     return () => {
       console.log("PaymentBridge: Removing message listener.");
       window.removeEventListener('message', handleMessage);
     };
-  }, []); // Run only once on mount
+  }, [isInIframe]); // Run when isInIframe changes
 
   // This component does not render anything itself
   return null;

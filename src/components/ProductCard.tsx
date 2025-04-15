@@ -83,7 +83,7 @@ const ProductCard = ({
           ) : (
             <>
               <Wallet className="mr-2 h-4 w-4" />
-              Connect Wallet to Buy
+              Connect wallet to purchase
             </>
           )}
         </Button>

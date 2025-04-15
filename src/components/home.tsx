@@ -249,34 +249,23 @@ const Home = () => {
         <section>
           <h2 className="text-3xl font-bold mb-6 text-center sm:text-left">Products</h2>
 
-          {isConnected ? (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                {shopConfig.products.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    id={product.id}
-                    name={product.name}
-                    description={product.description}
-                    price={product.price}
-                    currency={product.currency}
-                    emoji={product.emoji}
-                    inStock={product.inStock}
-                    onCheckout={handleOpenCheckoutModal}
-                    isWalletConnected={isConnected}
-                    onConnectWallet={handleConnectWallet}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-10 bg-gray-50 dark:bg-gray-800 rounded-lg">
-              <Wallet size={48} className="mx-auto mb-4 text-gray-400" />
-              <p className="mb-4 text-lg font-semibold">Connect Your Wallet</p>
-              <p className="mb-6 text-gray-600 dark:text-gray-400">Please connect your wallet to view and purchase products.</p>
-              <Button onClick={handleConnectWallet} size="lg">Connect Wallet</Button>
-            </div>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            {shopConfig.products.map((product) => (
+              <ProductCard
+                key={product.id}
+                id={product.id}
+                name={product.name}
+                description={product.description}
+                price={product.price}
+                currency={product.currency}
+                emoji={product.emoji}
+                inStock={product.inStock}
+                onCheckout={handleOpenCheckoutModal}
+                isWalletConnected={isConnected}
+                onConnectWallet={handleConnectWallet}
+              />
+            ))}
+          </div>
         </section>
       </main>
 
