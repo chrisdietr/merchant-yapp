@@ -72,9 +72,9 @@ const ProductCard = ({
       <CardFooter>
         <Button
           onClick={handleCheckout}
-          className={`w-full ${!isAvailable ? '' : 'bg-purple-700 hover:bg-purple-800 dark:bg-purple-600 dark:hover:bg-purple-700 text-white'}`}
+          className={`w-full ${isWalletConnected && isAvailable ? 'bg-purple-700 hover:bg-purple-800 dark:bg-purple-600 dark:hover:bg-purple-700 text-white' : ''}`}
           disabled={!isAvailable}
-          variant="default"
+          variant={isWalletConnected && isAvailable ? "default" : "outline"}
         >
           {!isAvailable ? (
             "Sold Out"
@@ -82,8 +82,8 @@ const ProductCard = ({
             "Buy Now"
           ) : (
             <>
-              <Wallet className="mr-1 h-4 w-4 flex-shrink-0" />
-              <span className="whitespace-nowrap text-sm">Connect wallet</span>
+              <Wallet className="mr-2 h-4 w-4" />
+              Connect wallet to purchase
             </>
           )}
         </Button>

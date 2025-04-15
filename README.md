@@ -113,10 +113,14 @@ Add the following to your `.env` file:
 VITE_ADMIN_CONFIG={"admins":[{"ens":"YOUR_ENS_NAME.eth","address":"0xYOUR_WALLET_ADDRESS"}]}
 ```
 
+This setting defines the wallet that will receive all crypto payments - essentially your "seller wallet" or payment destination. When customers make a purchase, funds will be sent to this address.
+
 This JSON string contains:
-- `admins`: An array of admin wallets
+- `admins`: An array of admin wallets (currently only the first one is used)
   - `ens`: Your ENS name (optional if address is provided)
   - `address`: Your Ethereum wallet address (optional if ENS is provided)
+
+Make sure this is set correctly as all payments will be directed to this wallet!
 
 ## Product Configuration Options
 
