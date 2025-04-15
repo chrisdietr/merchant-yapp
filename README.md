@@ -76,6 +76,7 @@ yarn install
    - Copy `.env.example` to `.env`
    - Add your WalletConnect Project ID from [WalletConnect Cloud](https://cloud.walletconnect.com/)
    - Configure your admin and shop settings (see Configuration section below)
+   - **IMPORTANT**: Never commit your `.env` file to source control
 
 4. Start the development server:
 ```bash

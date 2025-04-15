@@ -1,34 +1,124 @@
-# Deploying Merchant Yapp to Vercel
+# Deploying Merchant Yapp
 
-This guide explains how to deploy the Merchant Yapp application to Vercel and Docker.
+This guide explains how to deploy the Merchant Yapp application using various platforms and methods.
 
 ## Prerequisites
 
-1. A Vercel account (sign up at [vercel.com](https://vercel.com)) - For Vercel deployment
-2. Git repository with your Merchant Yapp code
-3. Node.js installed on your local machine
-4. Docker installed - For Docker deployment
+1. Git repository with your Merchant Yapp code
+2. Environment variables configured (copy from `.env.example` to `.env`)
+3. Node.js installed on your local machine (for local development and builds)
 
 ## Deployment Options
 
-### A. Vercel Deployment
+### A. Docker Deployment
 
-#### 1. Prepare Your Project
+Docker provides a consistent deployment environment across different platforms.
 
-Ensure your project has the following files correctly configured:
+#### 1. Using docker-compose (Recommended)
 
-- `vercel.json` - Contains the Vercel-specific configuration
-- `.env.production` - Contains production environment variables, including:
-  - `VITE_ADMIN_CONFIG` - JSON configuration for admin settings
-  - `VITE_SHOP_CONFIG` - JSON configuration for shop settings
-  - `VITE_WALLETCONNECT_PROJECT_ID` - Your WalletConnect project ID
-- `vite.config.ts` - Configured for Vercel deployment
+The included `docker-compose.yml` file makes it easy to deploy the application:
 
-#### 2. Deploy to Vercel
+```bash
+# Build and start the container
+docker-compose up -d
 
-##### Option 1: Deploy via the Vercel Dashboard (Web UI)
+# View logs
+docker-compose logs -f
 
-Use this method if you prefer a graphical interface and want to connect to your Git repository for continuous deployment.
+# Stop the container
+docker-compose down
+```
+
+Environment variables can be configured in the `docker-compose.yml` file or by creating a `.env` file.
+
+#### 2. Using Docker directly
+
+```bash
+# Build the Docker image
+docker build -t merchant-yapp .
+
+# Run the container
+docker run -d -p 8080:80 --name merchant-yapp merchant-yapp
+
+# With environment variables
+docker run -d -p 8080:80 \
+  -e VITE_ADMIN_CONFIG='{"admins":[{"ens":"your.ens","address":"0x123..."}]}' \
+  -e VITE_SHOP_CONFIG='{"shops":[{"name":"Your Shop"}],"products":[...]}' \
+  -e VITE_WALLET_CONNECT_PROJECT_ID='your_project_id' \
+  --name merchant-yapp merchant-yapp
+
+# Stop the container
+docker stop merchant-yapp
+
+# Remove the container
+docker rm merchant-yapp
+```
+
+#### 3. Deploying with Coolify
+
+[Coolify](https://coolify.io/) is an open-source self-hosted platform for deploying applications.
+
+1. Install Coolify on your server following the [official documentation](https://docs.coolify.io/installation)
+
+2. Add your Git repository to Coolify:
+   - Go to Resources → Create Resource → Application
+   - Select your Git provider and repository
+   - Choose "Docker" as deployment method
+
+3. Configure the build:
+   - Set the repository branch (e.g., `main`)
+   - Docker Configuration:
+     - Path to Dockerfile: `./Dockerfile`
+     - Docker Compose: Toggle on if you want to use docker-compose.yml
+     - Container Port: `80`
+     - Published Port: `8080` (or your preferred port)
+
+4. Configure environment variables:
+   - Add your environment variables from `.env.example`
+   - Make sure to set `VITE_ADMIN_CONFIG`, `VITE_SHOP_CONFIG`, and `VITE_WALLET_CONNECT_PROJECT_ID`
+
+5. Deploy the application
+
+#### 4. Other Docker PaaS Options
+
+You can deploy the Docker container to various platforms:
+
+- **DigitalOcean App Platform**:
+  ```bash
+  # Install doctl
+  brew install doctl  # macOS
+  
+  # Authenticate
+  doctl auth init
+  
+  # Create app
+  doctl apps create --spec app-spec.yaml
+  ```
+
+- **Google Cloud Run**:
+  ```bash
+  # Build and push to Google Container Registry
+  gcloud builds submit --tag gcr.io/PROJECT_ID/merchant-yapp
+  
+  # Deploy to Cloud Run
+  gcloud run deploy merchant-yapp --image gcr.io/PROJECT_ID/merchant-yapp --platform managed
+  ```
+
+- **AWS Elastic Container Service (ECS)**:
+  ```bash
+  # Push to Amazon ECR
+  aws ecr get-login-password | docker login --username AWS --password-stdin aws_account_id.dkr.ecr.region.amazonaws.com
+  docker tag merchant-yapp:latest aws_account_id.dkr.ecr.region.amazonaws.com/merchant-yapp:latest
+  docker push aws_account_id.dkr.ecr.region.amazonaws.com/merchant-yapp:latest
+  
+  # Deploy using CloudFormation or ECS CLI
+  ```
+
+### B. Vercel Deployment
+
+Vercel is ideal for frontend applications and provides a great developer experience.
+
+#### 1. Deploy via the Vercel Dashboard
 
 1. Go to [vercel.com](https://vercel.com) and log in
 2. Click "Add New..." → "Project"
@@ -37,139 +127,170 @@ Use this method if you prefer a graphical interface and want to connect to your 
    - Framework Preset: Vite
    - Build Command: `npm run build` (default)
    - Output Directory: `dist` (default)
-   - Install Command: `npm install` (default)
 5. Add Environment Variables:
-   - Add the variables from your `.env.production` file
-   - Make sure to add `VITE_WALLETCONNECT_PROJECT_ID`, `VITE_ADMIN_CONFIG`, and `VITE_SHOP_CONFIG`
+   - Add the variables from your `.env` file
 6. Click "Deploy"
 
-##### Option 2: Deploy via Vercel CLI (Command Line)
-
-Use this method if you prefer working from the command line or need to automate deployments.
-
-1. Install the Vercel CLI:
-   ```bash
-   npm install -g vercel
-   ```
-
-2. Log in to Vercel:
-   ```bash
-   vercel login
-   ```
-
-3. Deploy from your project directory:
-   ```bash
-   vercel
-   ```
-
-4. For a production deployment:
-   ```bash
-   vercel --prod
-   ```
-
-5. To specify environment variables on deploy:
-   ```bash
-   vercel --env VITE_ADMIN_CONFIG='{"admins":[{"ens":"your.ens","address":"0x123..."}]}' \
-          --env VITE_SHOP_CONFIG='{"shops":[{"name":"Your Shop","telegramHandle":"your_handle"}],"products":[...]}' \
-          --env VITE_WALLETCONNECT_PROJECT_ID='your_project_id'
-   ```
-
-### B. Docker Deployment
-
-Docker provides a consistent deployment environment across different platforms.
-
-#### 1. Build the Docker Image
+#### 2. Deploy via Vercel CLI
 
 ```bash
-# Basic build
-docker build -t merchant-yapp .
+# Install the Vercel CLI
+npm install -g vercel
 
-# Build with build args
-docker build -t merchant-yapp \
-  --build-arg VITE_WALLETCONNECT_PROJECT_ID=your_project_id \
-  --build-arg VITE_ADMIN_CONFIG='{"admins":[{"ens":"your.ens","address":"0x123..."}]}' \
-  --build-arg VITE_SHOP_CONFIG='{"shops":[{"name":"Your Shop"}],"products":[...]}' \
-  .
+# Log in to Vercel
+vercel login
+
+# Deploy from your project directory
+vercel
+
+# For a production deployment
+vercel --prod
 ```
 
-#### 2. Run the Docker Container
+### C. Netlify Deployment
+
+Netlify is another excellent platform for frontend applications.
+
+#### 1. Deploy via the Netlify Dashboard
+
+1. Go to [netlify.com](https://netlify.com) and log in
+2. Click "Add new site" → "Import an existing project"
+3. Connect to your Git provider and select your repository
+4. Configure the build settings:
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+5. Add environment variables in the "Environment" section
+6. Click "Deploy site"
+
+#### 2. Deploy via Netlify CLI
 
 ```bash
-# Basic run on port 3000
-docker run -p 3000:80 merchant-yapp
+# Install the Netlify CLI
+npm install -g netlify-cli
 
-# Run with environment variables
-docker run -p 3000:80 \
-  -e VITE_WALLETCONNECT_PROJECT_ID=your_project_id \
-  -e VITE_ADMIN_CONFIG='{"admins":[{"ens":"your.ens","address":"0x123..."}]}' \
-  -e VITE_SHOP_CONFIG='{"shops":[{"name":"Your Shop"}],"products":[...]}' \
-  merchant-yapp
+# Log in to Netlify
+netlify login
 
-# Run in detached mode (background)
-docker run -d -p 3000:80 merchant-yapp
+# Initialize Netlify site configuration
+netlify init
 
-# Run with a name and auto-restart
-docker run -d -p 3000:80 --name merchant-yapp-app --restart unless-stopped merchant-yapp
+# Deploy the site
+netlify deploy
+
+# For production deployment
+netlify deploy --prod
 ```
 
-#### 3. Docker Compose (Optional)
+## Environment Variables
 
-Create a `docker-compose.yml` file:
+The application uses the following environment variables:
+
+- `VITE_ADMIN_CONFIG`: JSON string containing admin wallet information
+- `VITE_SHOP_CONFIG`: JSON string containing shop and product information
+- `VITE_WALLETCONNECT_PROJECT_ID`: Your WalletConnect project ID (get from [WalletConnect Cloud](https://cloud.walletconnect.com/))
+- `VITE_BASE_URL`: Base URL for production deployments (optional)
+- `VITE_TEMPO`: Feature flag for enabling Tempo devtools (optional)
+
+### Security Best Practices
+
+1. **Never commit environment files with real credentials to your repository**
+   - Only commit the `.env.example` file as a template
+   - Keep `.env` and `.env.production` in your `.gitignore` file (already configured)
+
+2. **Setting up environment variables**:
+   ```bash
+   # Copy the example file
+   cp .env.example .env
+   
+   # Edit with your actual values
+   nano .env
+   ```
+
+3. **For production deployments**:
+   - Set environment variables through your deployment platform's UI/CLI
+   - For Docker, pass them via environment flags or mount as secrets
+   - For CI/CD pipelines, use secrets management as shown in the GitHub Actions example
+
+Refer to `.env.example` for the format of these variables.
+
+## Continuous Integration and Deployment
+
+### GitHub Actions
+
+Create a `.github/workflows/deploy.yml` file for automatic deployments:
 
 ```yaml
-version: '3'
-services:
-  merchant-yapp:
-    build: .
-    ports:
-      - "3000:80"
-    environment:
-      - VITE_WALLETCONNECT_PROJECT_ID=your_project_id
-      - VITE_ADMIN_CONFIG={"admins":[{"ens":"your.ens","address":"0x123..."}]}
-      - VITE_SHOP_CONFIG={"shops":[{"name":"Your Shop"}],"products":[...]}
-    restart: unless-stopped
+name: Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build
+        run: npm run build
+        env:
+          VITE_ADMIN_CONFIG: ${{ secrets.VITE_ADMIN_CONFIG }}
+          VITE_SHOP_CONFIG: ${{ secrets.VITE_SHOP_CONFIG }}
+          VITE_WALLET_CONNECT_PROJECT_ID: ${{ secrets.VITE_WALLET_CONNECT_PROJECT_ID }}
+      
+      # Deploy to your preferred platform
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v20
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: '--prod'
 ```
-
-Then run:
-
-```bash
-docker-compose up -d
-```
-
-## Post-Deployment Steps
-
-### 1. Configure Custom Domain
-
-1. In the Vercel dashboard, go to your project settings
-2. Click on "Domains"
-3. Add your domain (e.g., `merchant-yapp.yourdomain.com`)
-4. Follow the instructions to configure DNS settings
-
-### 2. Verify Deployment
-
-1. Visit your deployed site at your domain or Vercel URL
-2. Verify that all functionality works correctly:
-   - Wallet connections
-   - Payment processing
-   - Order confirmations
-   - QR code generation
 
 ## Troubleshooting
 
-### URL Issues
+### 1. Content Security Policy (CSP) Issues
 
-If you encounter issues with URLs or redirects:
+If you encounter frame embedding issues:
 
-1. Check that environment variables are properly set
-2. Verify that the URL utilities are being used correctly
-3. Check browser console for any errors related to URL generation
+- Check that your `vercel.json` or `nginx.conf` includes the proper CSP headers
+- For Netlify, ensure your `public/_headers` file contains the proper headers
 
-### API Limitations
+### 2. Environment Variable Issues
 
-Remember that some RPC providers may have different rate limits in production. Consider using dedicated API keys for production deployment.
+- Verify that all environment variables are correctly set
+- Docker: Check that environment variables are passed correctly to the container
+- Vercel/Netlify: Check that environment variables are set in the dashboard
 
-## Continuous Deployment
+### 3. Build Failures
 
-Vercel automatically deploys your application when you push changes to your connected Git repository. No additional configuration is needed for continuous deployment.
+- Make sure your Node.js version is compatible (v16+)
+- Check that all dependencies are installed correctly
+- Verify that the build script in package.json is correct
 
-For Docker-based deployments, consider setting up a CI/CD pipeline with GitHub Actions, GitLab CI, or Jenkins to automate your build and deployment process. 
+## Best Practices
+
+1. **Security**:
+   - Never commit sensitive information to your Git repository
+   - Use environment variables for sensitive data
+   - Keep the `.env` file in `.gitignore`
+
+2. **Performance**:
+   - Use a CDN for static assets
+   - Enable HTTP/2 in your web server
+   - Configure proper caching headers
+
+3. **Monitoring**:
+   - Set up health checks
+   - Monitor server load and response times
+   - Configure logging for easier debugging 

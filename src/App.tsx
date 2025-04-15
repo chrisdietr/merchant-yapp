@@ -15,7 +15,7 @@ const chains = [mainnet, polygon, optimism, arbitrum, base, gnosis] as const;
 
 const { connectors } = getDefaultWallets({
   appName: 'Merchant Yapp',
-  projectId: '08ab6e0bb13605f4b9d678b99067a0c2',
+  projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
 });
 
 const wagmiConfig = createConfig({
