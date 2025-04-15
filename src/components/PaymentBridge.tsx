@@ -40,6 +40,26 @@ const PaymentBridge: React.FC = () => {
           if (chainId !== undefined) { // Only add chainId if it exists and is not null/undefined
              confirmationUrl.searchParams.set('chainId', String(chainId));
           }
+          
+          // Add order details if available
+          try {
+            const storedOrderDetails = localStorage.getItem(orderId) || localStorage.getItem(`order_${orderId}`);
+            if (storedOrderDetails) {
+              const orderDetails = JSON.parse(storedOrderDetails);
+              // Add essential order details to URL
+              if (orderDetails.name) confirmationUrl.searchParams.set('name', orderDetails.name);
+              if (orderDetails.price) confirmationUrl.searchParams.set('price', orderDetails.price.toString());
+              if (orderDetails.currency) confirmationUrl.searchParams.set('currency', orderDetails.currency);
+              if (orderDetails.emoji) confirmationUrl.searchParams.set('emoji', orderDetails.emoji);
+              if (orderDetails.timestamp) {
+                confirmationUrl.searchParams.set('timestamp', encodeURIComponent(orderDetails.timestamp));
+              }
+              console.log("PaymentBridge: Added order details to confirmation URL");
+            }
+          } catch (e) {
+            console.error("PaymentBridge: Error adding order details to URL:", e);
+          }
+          
           const fullConfirmationPath = confirmationUrl.pathname + confirmationUrl.search;
           console.log("PaymentBridge: Constructed full confirmation path:", fullConfirmationPath);
 
