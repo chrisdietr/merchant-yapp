@@ -13,6 +13,40 @@ A decentralized point-of-sale application with crypto payments built with React,
 - **Telegram Integration**: Direct customer communication with transaction receipts
 - **Inventory Management**: Support for in-stock, out-of-stock, and unlimited inventory
 - **Environment-Based Configuration**: Easy setup with environment variables
+- **Yodl Integration**: Seamless crypto payments through Yodl's SDK
+
+## Payment Processing with Yodl
+
+The application uses Yodl SDK to handle payment processing. The integration supports both iframe and redirect payment flows:
+
+### How It Works
+
+1. **Initialization**: The SDK is initialized once as a singleton in the `YodlProvider` context
+2. **Payment Request**: When a customer initiates a purchase, the app creates a payment request with:
+   - Product details (name, price, currency)
+   - A unique order ID (used for tracking)
+   - Customer information (if provided)
+   - Redirect URL for completion
+3. **Payment Flow**:
+   - **Iframe Mode**: When running inside the Yodl platform, payments happen within the page
+   - **Redirect Mode**: When running standalone, the user is redirected to complete payment and return
+4. **Confirmation**: Upon payment completion, transaction details are saved and confirmation is displayed
+
+### Key Features
+
+- **Automatic Detection**: Identifies whether to use iframe or redirect mode
+- **Persistent Storage**: Stores order and payment details in localStorage
+- **Error Handling**: Comprehensive error handling for cancellations, timeouts, and failures
+- **Cross-device Support**: Order details can be accessed across devices via QR codes
+- **Responsive UI**: Adapts payment interface based on device type
+
+### Implementation Notes
+
+The payment system is implemented through:
+- `YodlContext.tsx`: Core provider for payment functionality
+- `CheckoutModal.tsx`: User interface for payment initiation
+- `OrderConfirmation.tsx`: Order status and receipt display
+- `PaymentBridge.tsx`: Handles cross-window communication
 
 ## Quick Start
 

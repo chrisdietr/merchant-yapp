@@ -5,7 +5,6 @@ import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -343,19 +342,19 @@ const OrderConfirmation = () => {
                   </div>
               )}
             </div>
-          </CardContent>
-          
-          <CardFooter className="flex flex-col sm:flex-row gap-4 justify-center">
+            
             {isSuccess && shopTelegramHandle && (
-              <Button 
-                variant="default"
-                onClick={() => window.open(telegramLink, "_blank")}
-              >
-                <Send className="mr-2 h-4 w-4" />
-                Contact Seller
-              </Button>
+              <div className="mt-4 flex justify-center">
+                <Button 
+                  variant="default"
+                  onClick={() => window.open(telegramLink, "_blank")}
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  Contact Seller
+                </Button>
+              </div>
             )}
-          </CardFooter>
+          </CardContent>
         </Card>
 
         {/* Side Column (Transaction Preview only) */}

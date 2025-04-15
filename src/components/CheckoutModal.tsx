@@ -5,7 +5,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -69,28 +68,42 @@ const CheckoutModal = ({
 
   const handleStartPayment = async () => {
     if (!product) return;
+    
+    // Check if name is provided (now required)
+    if (!userName.trim()) {
+      alert("Please enter your name to continue");
+      return;
+    }
+    
     setPaymentStatus("processing");
     setProgress(10);
 
-    // Format userName for inclusion in memo if provided
-    const formattedOrderId = userName.trim() 
-      ? `${orderId}_${userName.trim().replace(/[^a-zA-Z0-9_-]/g, '_').substring(0, 30)}`
-      : orderId;
+    // Create timestamp and format it efficiently
+    const timestamp = Date.now().toString().substring(6); // Use only last 7 digits of timestamp
+    
+    // Format order ID to include product name, name and timestamp
+    // Ensure we keep it under 32 bytes by truncating longer parts
+    const productNameShort = product.name.substring(0, 8).replace(/\s+/g, '_');
+    const userNameShort = userName.trim().substring(0, 8).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const formattedOrderId = `${productNameShort}_for_${userNameShort}_${timestamp}`;
+    
+    // Ensure order ID is under 32 bytes (32 characters for ASCII)
+    const finalOrderId = formattedOrderId.substring(0, 31);
 
     try {
       const confirmationUrl = generateConfirmationUrl(orderId);
-      console.log(`Starting payment for order ${formattedOrderId}${isInIframe ? ' (in iframe mode)' : ''}`);
+      console.log(`Starting payment for order ${finalOrderId}${isInIframe ? ' (in iframe mode)' : ''}`);
 
       const payment = await createPayment({
         amount: product.price,
         currency: product.currency,
         description: product.name,
-        orderId: formattedOrderId, // Use formatted order ID with user name
+        orderId: finalOrderId,
         metadata: {
           productId: product.id,
           productName: product.name,
           orderId: orderId, // Keep original order ID in metadata
-          customerName: userName.trim(), // Add customer name to metadata
+          customerName: userName.trim(),
           emoji: product.emoji,
           quantity: "1"
         },
@@ -99,14 +112,14 @@ const CheckoutModal = ({
 
       console.log('Payment request successful (or redirect initiated):', payment);
 
-      if (isInIframe && payment?.txHash) {
+      if (payment?.txHash) {
         try {
           localStorage.setItem(`payment_${orderId}`, JSON.stringify({
             txHash: payment.txHash,
             chainId: payment.chainId
           }));
         } catch (e) {
-          console.error("Failed to save iframe payment result to localStorage", e);
+          console.error("Failed to save payment result to localStorage", e);
         }
         setProgress(100);
         setPaymentStatus("success");
@@ -114,13 +127,10 @@ const CheckoutModal = ({
           navigate(`/confirmation?orderId=${orderId}`);
           onClose();
         }, 1500);
-      } else if (!isInIframe) {
+      } else {
+        // In redirect flow (or payment not immediately confirmed)
         setPaymentStatus("processing");
         setProgress(50);
-      } else {
-        console.warn("Payment initiated, but no immediate txHash in iframe mode.");
-        setPaymentStatus("processing");
-        setProgress(30);
       }
 
     } catch (error: any) {
@@ -175,20 +185,21 @@ const CheckoutModal = ({
         {/* Add user name input field */}
         <div className="mb-4">
           <Label htmlFor="userName" className="text-sm font-medium">
-            Your Name
+            Your Name <span className="text-red-500">*</span>
           </Label>
           <div className="flex items-center mt-1.5">
             <User className="w-4 h-4 mr-2 text-muted-foreground" />
             <Input
               id="userName"
-              placeholder="Enter your name (optional)"
+              placeholder="Enter your name"
               value={userName}
               onChange={(e) => setUserName(e.target.value)}
               className="flex-1"
+              required
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Your name will be included in the transaction memo to help the seller identify your purchase
+            Your name is required and will be included in the transaction memo
           </p>
         </div>
 
@@ -236,9 +247,9 @@ const CheckoutModal = ({
           </div>
         )}
 
-        <DialogFooter className="mt-4 sm:mt-6">
+        <div className="mt-4 sm:mt-6 flex justify-end">
           <Button variant="outline" onClick={onClose}>Close</Button>
-        </DialogFooter>
+        </div>
       </DialogContent>
     </Dialog>
   );

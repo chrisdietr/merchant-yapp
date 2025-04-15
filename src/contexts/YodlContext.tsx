@@ -1,10 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import YappSDK, { FiatCurrency, isInIframe } from '@yodlpay/yapp-sdk';
+import YappSDK, { FiatCurrency, Payment, isInIframe } from '@yodlpay/yapp-sdk';
 import { adminConfig } from '../config/config';
 import { generateConfirmationUrl } from '../utils/url';
 import useDeviceDetection from '../hooks/useMediaQuery';
-import { useYodlMessageListener, useYodlUrlPaymentCheck } from '../hooks/useYodlMessageListener';
 
+// Define the context types
 interface YodlContextType {
   yodl: YappSDK;
   createPayment: (params: {
@@ -14,37 +14,47 @@ interface YodlContextType {
     orderId: string;
     metadata?: Record<string, any>;
     redirectUrl?: string;
-  }) => Promise<any>;
+  }) => Promise<Payment | null>;
   isInIframe: boolean;
   merchantAddress: string;
   merchantEns: string;
-  parsePaymentFromUrl: () => any;
+  parsePaymentFromUrl: () => Partial<Payment> | null;
 }
 
-const YodlContext = createContext<YodlContextType | null>(null);
+// Create context with default values
+const YodlContext = createContext<YodlContextType>({
+  yodl: new YappSDK(),
+  createPayment: async () => null,
+  isInIframe: false,
+  merchantAddress: '',
+  merchantEns: '',
+  parsePaymentFromUrl: () => null,
+});
 
-export const useYodl = () => {
-  const context = useContext(YodlContext);
-  if (!context) {
-    throw new Error('useYodl must be used within a YodlProvider');
-  }
-  return context;
-};
+// Custom hook for accessing the Yodl context
+export const useYodl = () => useContext(YodlContext);
 
 interface YodlProviderProps {
   children: React.ReactNode;
 }
 
+// Helper to clean payment parameters from URL
+const cleanPaymentUrl = () => {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('txHash');
+  url.searchParams.delete('chainId');
+  window.history.replaceState({}, document.title, url.toString());
+};
+
 export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
-  // Initialize SDK once
-  const [yodl] = useState(() => new YappSDK({}));
+  // Initialize SDK once as a singleton
+  const [yodl] = useState(() => new YappSDK());
   const isInIframeValue = isInIframe();
   
   // Use our media query-based detection
   const { isMobile, isTouch } = useDeviceDetection();
   
   // Get merchant address from validated config
-  // The config.ts ensures at least one admin exists and has ens or address
   const merchantAdmin = adminConfig.admins[0];
   const merchantAddress = merchantAdmin.address || "";
   const merchantEns = merchantAdmin.ens || "";
@@ -53,16 +63,119 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
   useEffect(() => {
     if (!merchantAddress && !merchantEns) {
       console.error("CRITICAL: No merchant address or ENS found in validated config. Payment requests will fail.");
-      // Optionally throw an error or display a message to the user
     }
   }, [merchantAddress, merchantEns]);
 
-  // Use our custom hooks for Yodl message handling
-  useYodlMessageListener({ isInIframe: isInIframeValue });
-  useYodlUrlPaymentCheck({ 
-    parseUrlFunction: () => yodl.parsePaymentFromUrl(),
-    isInIframe: isInIframeValue 
-  });
+  // Check for payment information in URL on component mount
+  useEffect(() => {
+    // Parse payment information from URL (for redirect flow)
+    const urlPaymentResult = yodl.parsePaymentFromUrl();
+
+    if (urlPaymentResult && urlPaymentResult.txHash) {
+      console.log('Payment detected in URL:', urlPaymentResult);
+      
+      const orderId = (urlPaymentResult as any).memo || '';
+      
+      if (orderId) {
+        // Payment was successful via redirect
+        console.log('Payment successful (redirect):', urlPaymentResult);
+        
+        // Store payment details
+        try {
+          localStorage.setItem(`payment_${orderId}`, JSON.stringify({
+            txHash: urlPaymentResult.txHash,
+            chainId: urlPaymentResult.chainId
+          }));
+          
+          // Broadcast successful payment message
+          const message = {
+            type: 'payment_complete',
+            txHash: urlPaymentResult.txHash,
+            chainId: urlPaymentResult.chainId,
+            orderId
+          };
+          
+          // Broadcast locally
+          window.postMessage(message, '*');
+          
+          // Broadcast to parent if in iframe
+          if (isInIframeValue && window.parent) {
+            window.parent.postMessage(message, '*');
+          }
+        } catch (e) {
+          console.error("Error saving payment details:", e);
+        }
+      }
+      
+      // Clean the URL to prevent duplicate processing on refresh
+      cleanPaymentUrl();
+    }
+  }, [yodl, isInIframeValue]);
+  
+  // Handle message events for payment completion
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      const data = event.data;
+      
+      // Verify this is likely a Yodl payment message
+      const isPaymentMessage = 
+        data && 
+        typeof data === 'object' && 
+        !data.target && // Filter out browser extension messages
+        data.txHash && 
+        (data.orderId || data.memo);
+      
+      // Skip if already standardized to prevent loops
+      if (isPaymentMessage && data.type !== 'payment_complete') {
+        const txHash = data.txHash;
+        const chainId = data.chainId;
+        const orderId = data.orderId || data.memo;
+        
+        if (!txHash || !orderId) {
+          console.log("Message missing required transaction data", data);
+          return;
+        }
+        
+        console.log(`Processing payment result for order ${orderId}:`, { txHash, chainId });
+        
+        // Store in localStorage for persistence
+        try {
+          localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
+        } catch (err) {
+          console.error("Failed to save payment data to localStorage:", err);
+        }
+        
+        // Create standardized message
+        const standardizedMessage = {
+          type: 'payment_complete',
+          txHash,
+          chainId,
+          orderId
+        };
+        
+        // Broadcast standardized message
+        try {
+          // Broadcast locally 
+          window.postMessage(standardizedMessage, '*');
+          
+          // Broadcast to parent if in iframe
+          if (isInIframeValue && window.parent) {
+            window.parent.postMessage(standardizedMessage, '*');
+          }
+        } catch (e) {
+          console.error("Error broadcasting message:", e);
+        }
+      }
+    };
+    
+    // Add event listener
+    window.addEventListener('message', handleMessage);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('message', handleMessage);
+    };
+  }, [isInIframeValue]);
 
   // Simple wrapper to expose the SDK's URL parsing function
   const parsePaymentFromUrl = () => {
@@ -77,15 +190,14 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
     orderId: string;
     metadata?: Record<string, any>;
     redirectUrl?: string;
-  }) => {
+  }): Promise<Payment | null> => {
     try {
       const recipientIdentifier = merchantEns || merchantAddress;
       if (!recipientIdentifier) {
-        // This check is now redundant due to the useEffect above, but kept for safety
         throw new Error("No merchant address or ENS configured.");
       }
       
-      // Determine redirectUrl
+      // Determine redirectUrl - required when not in iframe mode
       let redirectUrl = params.redirectUrl || generateConfirmationUrl(params.orderId);
       if ((isMobile || isTouch) && !redirectUrl.startsWith('http')) {
         redirectUrl = new URL(redirectUrl, window.location.origin).toString();
@@ -117,8 +229,9 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         console.warn('Could not save order data to localStorage', e);
       }
             
-      // Request payment
-      const paymentResult = await yodl.requestPayment(recipientIdentifier, {
+      // Request payment using SDK
+      const paymentResult = await yodl.requestPayment({
+        addressOrEns: recipientIdentifier,
         amount: params.amount,
         currency: params.currency as FiatCurrency,
         memo: params.orderId,

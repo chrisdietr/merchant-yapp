@@ -16,7 +16,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "frame-ancestors 'self' https://yodl.me"
+          "value": "frame-ancestors 'self' https://yodl.me https://*.vercel.app https://*.netlify.app https://*.github.io *;"
         },
         {
           "key": "X-XSS-Protection",

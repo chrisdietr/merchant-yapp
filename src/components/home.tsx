@@ -1,12 +1,11 @@
 import React, { useContext, useState, useEffect } from "react";
 import { useAccount, useDisconnect } from 'wagmi';
-import { ConnectButton, useConnectModal } from '@rainbow-me/rainbowkit';
+import { ConnectButton, useConnectModal, useAccountModal } from '@rainbow-me/rainbowkit';
 import { useYodl } from '../contexts/YodlContext';
 import {
   Card,
   CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -24,6 +23,7 @@ const Home = () => {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { openConnectModal } = useConnectModal();
+  const { openAccountModal } = useAccountModal();
   const { createPayment, isInIframe } = useYodl();
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
@@ -53,7 +53,8 @@ const Home = () => {
         name: product.name,
         price: product.price,
         currency: product.currency,
-        emoji: product.emoji
+        emoji: product.emoji,
+        timestamp: new Date().toISOString()
       }));
       console.log(`[handleBuyNow] Stored details successfully for order ${orderId}`);
     } catch (e) {
@@ -138,7 +139,6 @@ const Home = () => {
           productName: product.name,
           emoji: product.emoji
         },
-        // Use consistent redirect URL
         redirectUrl: confirmationUrl
       });
       
@@ -174,6 +174,8 @@ const Home = () => {
         window.location.href = confirmationUrl;
       } else {
         console.log('[handleBuyNow] No immediate payment result, awaiting redirect or confirmation...');
+        // For redirect flow, the page will be redirected by the SDK
+        setIsProcessingPayment(null);
       }
     } catch (error) {
       console.error('[handleBuyNow] Call to createPayment failed:', error);
@@ -191,6 +193,12 @@ const Home = () => {
   const handleConnectWallet = () => {
     if (openConnectModal) {
       openConnectModal();
+    }
+  };
+
+  const handleDisconnectWallet = () => {
+    if (openAccountModal) {
+      openAccountModal();
     }
   };
 
@@ -222,19 +230,12 @@ const Home = () => {
             <div className="flex items-center gap-2 sm:gap-4">
               <ThemeToggle />
               {isConnected ? (
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded"> 
-                    <Wallet size={16} />
-                    <span className="text-sm font-medium">{address?.substring(0, 6)}...{address?.substring(address.length - 4)}</span>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => disconnect()} 
-                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-                  >
-                    Disconnect
-                  </Button>
+                <div 
+                  className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
+                  onClick={() => disconnect()}
+                > 
+                  <Wallet size={16} />
+                  <span className="text-sm font-medium">{address?.substring(0, 6)}...{address?.substring(address.length - 4)}</span>
                 </div>
               ) : (
                 <Button onClick={handleConnectWallet}>Connect Wallet</Button>
@@ -286,10 +287,6 @@ const Home = () => {
           product={selectedProduct}
         />
       )}
-
-      <footer className="mt-8 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
-        Powered by YODL
-      </footer>
     </div>
   );
 };
