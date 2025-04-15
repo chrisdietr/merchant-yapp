@@ -222,9 +222,19 @@ const Home = () => {
             <div className="flex items-center gap-2 sm:gap-4">
               <ThemeToggle />
               {isConnected ? (
-                <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded"> 
-                  <Wallet size={16} />
-                  <span className="text-sm font-medium">{address?.substring(0, 6)}...{address?.substring(address.length - 4)}</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded"> 
+                    <Wallet size={16} />
+                    <span className="text-sm font-medium">{address?.substring(0, 6)}...{address?.substring(address.length - 4)}</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => disconnect()} 
+                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                  >
+                    Disconnect
+                  </Button>
                 </div>
               ) : (
                 <Button onClick={handleConnectWallet}>Connect Wallet</Button>
