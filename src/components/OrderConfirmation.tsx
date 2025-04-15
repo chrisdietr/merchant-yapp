@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import { useYodl } from "../contexts/YodlContext";
 import {
@@ -50,6 +50,8 @@ const OrderConfirmation = () => {
   
   // Use our media query-based detection instead
   const { isMobile, isTouch } = useDeviceDetection();
+
+  const iframeRef = useRef<HTMLIFrameElement>(null);
 
   // Helper function to clean specific parameters from URL without reload
   const cleanUrlParams = (paramsToRemove: string[]) => {
@@ -285,6 +287,18 @@ const OrderConfirmation = () => {
   }
   const telegramLink = shopTelegramHandle ? `https://t.me/${shopTelegramHandle}?text=${telegramMessage}` : '#';
 
+  // Add a function to refresh the iframe
+  const refreshTransactionPreview = () => {
+    if (iframeRef.current) {
+      // Add a timestamp query parameter to force a refresh
+      const timestamp = new Date().getTime();
+      const url = new URL(yodlTxUrl);
+      url.searchParams.set('refresh', timestamp.toString());
+      iframeRef.current.src = url.toString();
+      console.log("Transaction Preview refreshed");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background dark:bg-gradient-to-br dark:from-purple-900 dark:via-indigo-900 dark:to-purple-800">
       <header className={`sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50 ${isInIframe ? 'py-2' : 'py-4'}`}>
@@ -423,8 +437,21 @@ const OrderConfirmation = () => {
           <div className="w-full lg:w-1/3 flex flex-col gap-8">
             {/* Transaction Preview Card (iframe) */}
             <Card>
-              <CardHeader>
-                <CardTitle className="text-lg text-center">Transaction Preview</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-lg">Transaction Preview</CardTitle>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={refreshTransactionPreview}
+                  title="Refresh transaction preview"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-refresh-cw">
+                    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                    <path d="M21 3v5h-5"></path>
+                    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                    <path d="M3 21v-5h5"></path>
+                  </svg>
+                </Button>
               </CardHeader>
               <CardContent className="flex flex-col items-center gap-2">
                 <p className="text-sm text-muted-foreground text-center px-2">Preview of the Yodl transaction page:</p>
@@ -438,6 +465,7 @@ const OrderConfirmation = () => {
                       </div>
                     </div>
                     <iframe
+                      ref={iframeRef}
                       src={yodlTxUrl}
                       title="Yodl Transaction Preview"
                       className="w-full h-full border-0 relative z-0"
@@ -448,11 +476,13 @@ const OrderConfirmation = () => {
                     </iframe>
                   </div>
                 </div>
-                 <Button asChild variant="link" size="sm">
-                   <a href={yodlTxUrl} target="_blank" rel="noopener noreferrer">
-                     View on yodl.me <ExternalLink className="ml-1 h-3 w-3" />
-                   </a>
-                 </Button>
+                <div className="flex items-center gap-2">
+                  <Button asChild variant="link" size="sm">
+                    <a href={yodlTxUrl} target="_blank" rel="noopener noreferrer">
+                      View on yodl.me <ExternalLink className="ml-1 h-3 w-3" />
+                    </a>
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </div>

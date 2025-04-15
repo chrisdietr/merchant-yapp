@@ -2,6 +2,7 @@ import React, { useContext, useState, useEffect } from "react";
 import { useAccount, useDisconnect } from 'wagmi';
 import { ConnectButton, useConnectModal, useAccountModal } from '@rainbow-me/rainbowkit';
 import { useYodl } from '../contexts/YodlContext';
+import { Link } from 'react-router-dom';
 import {
   Card,
   CardContent,
@@ -10,7 +11,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Wallet } from "lucide-react";
+import { Wallet, Shield } from "lucide-react";
 import ProductCard from "./ProductCard";
 import { shopConfig, Product, adminConfig } from "../config/config";
 import ThemeToggle from './ThemeToggle';
@@ -32,6 +33,25 @@ const Home = () => {
   
   // Use our media query-based detection instead
   const { isMobile, isTouch } = useDeviceDetection();
+
+  // Check if wallet is an admin
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!isConnected || !address) {
+      setIsAdmin(false);
+      return;
+    }
+
+    const matchesAdmin = adminConfig.admins.some((admin) => {
+      if (admin.address && address) {
+        return admin.address.toLowerCase() === address.toLowerCase();
+      }
+      return false;
+    });
+
+    setIsAdmin(matchesAdmin);
+  }, [address, isConnected]);
 
   const handleBuyNow = async (product: Product) => {
     console.log("[handleBuyNow] Clicked for:", product?.name);
@@ -229,6 +249,17 @@ const Home = () => {
           <div className={`${isInIframe ? 'w-full' : 'w-full sm:w-auto'} flex justify-end order-2 sm:order-none`}>
             <div className="flex items-center gap-2 sm:gap-4">
               <ThemeToggle />
+              
+              {/* Admin link - only show if user is admin */}
+              {isAdmin && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link to="/admin" className="flex items-center gap-1.5">
+                    <Shield size={14} />
+                    <span>Admin</span>
+                  </Link>
+                </Button>
+              )}
+              
               {isConnected ? (
                 <div 
                   className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 

@@ -19,6 +19,7 @@ interface YodlContextType {
   merchantAddress: string;
   merchantEns: string;
   parsePaymentFromUrl: () => Partial<Payment> | null;
+  checkTransactionStatus: (params: { memoId: string }) => Promise<any>;
 }
 
 // Create context with default values
@@ -29,6 +30,7 @@ const YodlContext = createContext<YodlContextType>({
   merchantAddress: '',
   merchantEns: '',
   parsePaymentFromUrl: () => null,
+  checkTransactionStatus: async () => null,
 });
 
 // Custom hook for accessing the Yodl context
@@ -182,6 +184,99 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
     return yodl.parsePaymentFromUrl();
   };
 
+  // Method to check transaction status by memo ID
+  const checkTransactionStatus = async (params: { memoId: string }): Promise<any> => {
+    try {
+      console.log(`Checking transaction status for memo ID: ${params.memoId}`);
+      
+      // If the memoId looks like a transaction hash (0x...), query directly
+      if (params.memoId.startsWith('0x') && params.memoId.length === 66) {
+        const txUrl = `https://tx.yodl.me/api/v1/payments/${params.memoId}`;
+        console.log(`Fetching transaction data from: ${txUrl}`);
+        
+        const response = await fetch(txUrl);
+        if (!response.ok) {
+          throw new Error(`API returned ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        console.log('Transaction data retrieved:', data);
+        
+        if (data && data.payment) {
+          const payment = data.payment;
+          return {
+            txHash: payment.txHash,
+            chainId: payment.chainId,
+            status: 'confirmed',
+            timestamp: payment.blockTimestamp,
+            currency: payment.invoiceCurrency,
+            amount: payment.invoiceAmount,
+            receiverAddress: payment.receiverAddress,
+            receiverEns: payment.receiverEnsPrimaryName,
+            senderAddress: payment.senderAddress,
+            senderEns: payment.senderEnsPrimaryName,
+            memo: payment.memo,
+            tokenSymbol: payment.tokenOutSymbol
+          };
+        }
+      } else {
+        // If it's a memo ID (order ID), search for transactions with this memo
+        // Note: This would require a different API endpoint that can search by memo
+        // For now, we can try to implement a simple search if we have a txHash in localStorage
+        // that we can use to look up the full details
+        const storedPayment = localStorage.getItem(`payment_${params.memoId}`);
+        if (storedPayment) {
+          try {
+            const paymentData = JSON.parse(storedPayment);
+            if (paymentData && paymentData.txHash) {
+              // Use the txHash to fetch the full details from the API
+              console.log(`Found txHash in localStorage for ${params.memoId}, fetching from API`);
+              const txUrl = `https://tx.yodl.me/api/v1/payments/${paymentData.txHash}`;
+              
+              const response = await fetch(txUrl);
+              if (!response.ok) {
+                throw new Error(`API returned ${response.status}: ${response.statusText}`);
+              }
+              
+              const data = await response.json();
+              console.log('Transaction data retrieved:', data);
+              
+              if (data && data.payment) {
+                const payment = data.payment;
+                return {
+                  txHash: payment.txHash,
+                  chainId: payment.chainId,
+                  status: 'confirmed',
+                  timestamp: payment.blockTimestamp,
+                  currency: payment.invoiceCurrency,
+                  amount: payment.invoiceAmount,
+                  receiverAddress: payment.receiverAddress,
+                  receiverEns: payment.receiverEnsPrimaryName,
+                  senderAddress: payment.senderAddress,
+                  senderEns: payment.senderEnsPrimaryName,
+                  memo: payment.memo,
+                  tokenSymbol: payment.tokenOutSymbol
+                };
+              }
+            }
+          } catch (e) {
+            console.error("Error retrieving transaction data:", e);
+          }
+        }
+        
+        // For future implementation: Direct memo search
+        // The ideal implementation would be an API that can search by memo:
+        // const searchUrl = `https://tx.yodl.me/api/v1/transactions/search?memo=${params.memoId}`;
+        console.log(`We need a dedicated API to search by memo. Currently using txHash lookup only.`);
+      }
+      
+      return null; // Return null if not found or if there's an error
+    } catch (error) {
+      console.error("Error checking transaction status:", error);
+      return null;
+    }
+  };
+
   // Request a payment using the Yodl SDK
   const createPayment = async (params: {
     amount: number;
@@ -294,17 +389,18 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
     }
   };
 
-  const contextValue = {
-    yodl,
-    createPayment,
-    parsePaymentFromUrl,
-    isInIframe: isInIframeValue,
-    merchantAddress,
-    merchantEns,
-  };
-
   return (
-    <YodlContext.Provider value={contextValue}>
+    <YodlContext.Provider
+      value={{
+        yodl,
+        createPayment,
+        isInIframe: isInIframeValue,
+        merchantAddress,
+        merchantEns,
+        parsePaymentFromUrl,
+        checkTransactionStatus
+      }}
+    >
       {children}
     </YodlContext.Provider>
   );

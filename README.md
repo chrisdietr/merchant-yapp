@@ -91,6 +91,20 @@ yarn dev
 
 The app is configured using environment variables. These can be set in your `.env` file for local development or through your hosting service for production.
 
+### Shop Configuration
+
+The shop configuration in the `.env` file is formatted as a multi-line JSON string for better readability. Each product is on its own line, making it easy to add, remove, or edit products.
+
+Example format:
+```
+VITE_SHOP_CONFIG={"shops":[{"name":"Your Shop Name","telegramHandle":"your_telegram"}],"products":[
+{"id":"1","name":"T-Shirt","description":"Premium cotton t-shirt","price":0.1,"currency":"USD","emoji":"👕","inStock":true},
+{"id":"2","name":"Hat","description":"One size fits all","price":0.05,"currency":"EUR","emoji":"🧢","inStock":true}
+]}
+```
+
+To add a new product, simply add a new line with the product details following the same format.
+
 ### Step 1: Configure Your Admin Wallet
 
 Add the following to your `.env` file:
@@ -103,20 +117,6 @@ This JSON string contains:
 - `admins`: An array of admin wallets
   - `ens`: Your ENS name (optional if address is provided)
   - `address`: Your Ethereum wallet address (optional if ENS is provided)
-
-### Step 2: Configure Your Shop
-
-Add the following to your `.env` file:
-
-```
-VITE_SHOP_CONFIG={"shops":[{"name":"Your Shop Name","telegramHandle":"your_telegram_handle"}],"products":[{"id":"1","name":"T-Shirt","description":"Premium cotton t-shirt","price":0.1,"currency":"USD","emoji":"👕","inStock":true}]}
-```
-
-This JSON string contains:
-- `shops`: An array of shop configurations
-  - `name`: Your shop name
-  - `telegramHandle`: Your Telegram handle for customer communication
-- `products`: An array of products with the following fields:
 
 ## Product Configuration Options
 
