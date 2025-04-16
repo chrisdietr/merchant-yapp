@@ -184,9 +184,9 @@ const CheckoutModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`${isInIframe ? 'sm:max-w-sm' : 'sm:max-w-md'} w-[90%] bg-background rounded-lg`}>
+      <DialogContent className={`${isInIframe ? 'sm:max-w-sm' : 'sm:max-w-md'} w-[92%] sm:w-[90%] bg-background rounded-lg`}>
         <DialogHeader>
-          <DialogTitle className={`${isInIframe ? 'text-xl' : 'text-2xl'} font-bold flex items-center gap-2`}>
+          <DialogTitle className={`${isInIframe ? 'text-xl' : 'text-lg sm:text-xl md:text-2xl'} font-bold flex items-center gap-2`}>
             <span>{product?.emoji}</span>
             <span>Checkout</span>
           </DialogTitle>
@@ -197,15 +197,15 @@ const CheckoutModal = ({
           )}
         </DialogHeader>
 
-        <div className="mt-4">
+        <div className="mt-3 sm:mt-4">
           <Card className="border border-border">
-            <CardContent className="pt-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
+            <CardContent className="pt-4 sm:pt-6 px-3 sm:px-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start gap-2 sm:gap-4">
                 <div>
-                  <h3 className="font-medium text-lg">{product?.name}</h3>
+                  <h3 className="font-medium text-base sm:text-lg">{product?.name}</h3>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="font-bold text-lg">
+                  <p className="font-bold text-base sm:text-lg">
                     {product?.price} {product?.currency}
                   </p>
                 </div>
@@ -214,14 +214,14 @@ const CheckoutModal = ({
           </Card>
         </div>
 
-        <Separator className="my-4" />
+        <Separator className="my-3 sm:my-4" />
         
         {/* Add user name input field */}
-        <div className="mb-4">
+        <div className="mb-3 sm:mb-4">
           <Label htmlFor="userName" className="text-sm font-medium">
             Your Name <span className="text-red-500">*</span>
           </Label>
-          <div className="flex items-center mt-1.5">
+          <div className="flex items-center mt-1 sm:mt-1.5">
             <User className="w-4 h-4 mr-2 text-muted-foreground" />
             <Input
               id="userName"
@@ -233,7 +233,7 @@ const CheckoutModal = ({
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Your name is required and will be included in the transaction memo
+            Your name is required and will be included in the transaction memo for seller identification
           </p>
         </div>
 

@@ -133,9 +133,9 @@ Vercel is ideal for frontend applications and provides a great developer experie
 
 #### 2. Deploy via Vercel CLI
 
-```bash
+   ```bash
 # Install the Vercel CLI
-npm install -g vercel
+   npm install -g vercel
 
 # Log in to Vercel
 vercel login
@@ -164,7 +164,7 @@ Netlify is another excellent platform for frontend applications.
 
 #### 2. Deploy via Netlify CLI
 
-```bash
+   ```bash
 # Install the Netlify CLI
 npm install -g netlify-cli
 

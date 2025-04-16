@@ -86,6 +86,43 @@
   overflow-x: hidden;
 }
 
+/* Improve mobile responsiveness */
+@media (max-width: 640px) {
+  .container {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  
+  /* Optimize header for small screens */
+  header h1 {
+    font-size: 1.25rem;
+  }
+  
+  /* Ensure product cards are optimized for small screens */
+  [class*="product-grid"] {
+    grid-gap: 0.75rem;
+  }
+}
+
+/* Additional mobile optimizations */
+@media (max-width: 480px) {
+  .container {
+    padding-left: 0.75rem;
+    padding-right: 0.75rem;
+  }
+  
+  /* Further reduce spacing on very small screens */
+  [class*="product-grid"] {
+    grid-gap: 0.5rem;
+  }
+  
+  /* Optimize modal size for small screens */
+  [role="dialog"] {
+    width: 95% !important;
+    max-width: 95% !important;
+  }
+}
+
 /* Adjust spacing in iframe mode */
 .iframe-mode header {
   padding-top: 0.5rem !important;

@@ -18,13 +18,15 @@ import { generateConfirmationUrl } from "@/utils/url";
 import CheckoutModal from "./CheckoutModal";
 import { useToast } from "./ui/use-toast";
 import useDeviceDetection from "../hooks/useMediaQuery";
+import PurchaseHistory from './PurchaseHistory';
+import AdminTransactionHistory from './AdminTransactionHistory';
 
 const Home = () => {
   const { address, isConnected } = useAccount();
   const { disconnect } = useDisconnect();
   const { openConnectModal } = useConnectModal();
   const { openAccountModal } = useAccountModal();
-  const { createPayment, isInIframe } = useYodl();
+  const { createPayment, isInIframe, merchantAddress } = useYodl();
   const [isProcessingPayment, setIsProcessingPayment] = useState<string | null>(null);
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -32,6 +34,9 @@ const Home = () => {
   
   // Use our media query-based detection instead
   const { isMobile, isTouch } = useDeviceDetection();
+
+  // Determine if admin mode is active
+  const isAdmin = address && merchantAddress && address.toLowerCase() === merchantAddress.toLowerCase();
 
   const handleBuyNow = async (product: Product) => {
     console.log("[handleBuyNow] Clicked for:", product?.name);
@@ -219,11 +224,11 @@ const Home = () => {
 
   return (
     <div className="container mx-auto px-4 py-8 flex flex-col min-h-screen">
-      <header className={`sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50 ${isInIframe ? 'py-2' : 'py-3'}`}>
-        <div className="container mx-auto px-4 flex flex-wrap justify-between items-center sm:flex-nowrap">
+      <header className={`sticky top-0 z-10 w-full bg-background/95 dark:bg-transparent backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b dark:border-purple-700/50 ${isInIframe ? 'py-2' : 'py-2 sm:py-3'}`}>
+        <div className="container mx-auto px-3 sm:px-4 flex flex-wrap justify-between items-center sm:flex-nowrap">
           {!isInIframe && (
             <div className="w-full text-center order-1 sm:w-auto sm:text-left sm:order-none">
-              <h1 className="text-xl sm:text-2xl font-bold truncate inline-block">{shopConfig.shops[0].name}</h1> 
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold truncate inline-block">{shopConfig.shops[0].name}</h1> 
             </div>
           )}
           <div className={`${isInIframe ? 'w-full' : 'w-full sm:w-auto'} flex justify-end order-2 sm:order-none`}>
@@ -231,14 +236,14 @@ const Home = () => {
               <ThemeToggle />
               {isConnected ? (
                 <div 
-                  className="flex items-center gap-2 p-2 bg-gray-100 dark:bg-gray-800 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
-                  onClick={() => disconnect()}
+                  className="flex items-center gap-1 sm:gap-2 p-1.5 sm:p-2 bg-gray-100 dark:bg-gray-800 rounded cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors" 
+                  onClick={handleDisconnectWallet}
                 > 
-                  <Wallet size={16} />
-                  <span className="text-sm font-medium">{address?.substring(0, 6)}...{address?.substring(address.length - 4)}</span>
+                  <Wallet size={isMobile ? 14 : 16} />
+                  <span className="text-xs sm:text-sm font-medium">{address?.substring(0, 6)}...{address?.substring(address.length - 4)}</span>
                 </div>
               ) : (
-                <Button onClick={handleConnectWallet}>Connect Wallet</Button>
+                <Button onClick={handleConnectWallet} size={isMobile ? "sm" : "default"}>Connect Wallet</Button>
               )}
             </div>
           </div>
@@ -247,9 +252,9 @@ const Home = () => {
 
       <main className="flex-grow">
         <section>
-          <h2 className="text-3xl font-bold mb-6 text-center sm:text-left">Products</h2>
+          <h2 className="text-2xl font-bold mb-6 text-center sm:text-left">Products</h2>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 product-grid">
             {shopConfig.products.map((product) => (
               <ProductCard
                 key={product.id}
@@ -275,6 +280,28 @@ const Home = () => {
           onClose={handleCloseCheckoutModal}
           product={selectedProduct}
         />
+      )}
+
+      {!isConnected && (
+        <div className="max-w-2xl mx-auto mt-8">
+          <h2 className="text-2xl font-bold mb-4">Welcome to Merchant Yapp</h2>
+          <p className="mb-4">Connect your wallet to view your purchase history</p>
+          <Button onClick={openConnectModal}>Connect Wallet</Button>
+        </div>
+      )}
+
+      {isConnected && (
+        <div className="max-w-5xl mx-auto mt-12">
+          {/* Only show Purchase History if NOT admin */}
+          {!isAdmin && isConnected && <PurchaseHistory />}
+        </div>
+      )}
+
+      {/* Admin Transaction History (Conditionally Rendered) */}
+      {isAdmin && (
+        <div className="w-full max-w-7xl mx-auto mt-12 mb-12">
+          <AdminTransactionHistory />
+        </div>
       )}
     </div>
   );

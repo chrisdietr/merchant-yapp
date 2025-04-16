@@ -14,6 +14,9 @@ A decentralized point-of-sale application with crypto payments built with React,
 - **Inventory Management**: Support for in-stock, out-of-stock, and unlimited inventory
 - **Environment-Based Configuration**: Easy setup with environment variables
 - **Yodl Integration**: Seamless crypto payments through Yodl's SDK
+- **Purchase History**: Displays transaction history for connected users.
+- **Admin Mode**: Automatically activated when the configured admin wallet connects.
+- **Admin Transaction History**: Shows all relevant sales received by the admin wallet, separate from the user's purchase history.
 
 ## Payment Processing with Yodl
 
@@ -121,6 +124,14 @@ This JSON string contains:
   - `address`: Your Ethereum wallet address (optional if ENS is provided)
 
 Make sure this is set correctly as all payments will be directed to this wallet!
+
+### Admin Mode & Transaction History
+
+- **Admin Wallet**: Set your admin wallet address (and optional ENS) in `VITE_ADMIN_CONFIG`. This address receives payments.
+- **Admin Mode Activation**: If the connected wallet address matches the `VITE_ADMIN_CONFIG` address, Admin Mode is activated.
+- **Conditional Views**: 
+    - When Admin Mode is active, the `AdminTransactionHistory` component displays all relevant sales received by the admin.
+    - When a regular user is connected, the `PurchaseHistory` component displays their own past purchases from this shop.
 
 ## Product Configuration Options
 

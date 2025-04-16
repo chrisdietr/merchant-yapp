@@ -159,24 +159,24 @@ const OrderConfirmation = () => {
     // --- Step 5: Load Order Details from localStorage if not found in URL ---
     if (!detailsFound) {
       console.log("Order details not in URL, checking localStorage...");
-      try {
-        const storedDetails = localStorage.getItem(orderId) || localStorage.getItem(`order_${orderId}`);
-        if (storedDetails) {
-          const parsedDetails = JSON.parse(storedDetails);
-          // Format timestamp
-          if (!parsedDetails.timestamp) {
-             parsedDetails.timestamp = format(new Date(), 'PPP p');
-          } else {
-             try { parsedDetails.timestamp = format(new Date(parsedDetails.timestamp), 'PPP p'); } catch {}
-          }
-          setOrderDetails(parsedDetails as OrderDetails);
-          console.log("Loaded order details from localStorage:", parsedDetails);
+    try {
+      const storedDetails = localStorage.getItem(orderId) || localStorage.getItem(`order_${orderId}`);
+      if (storedDetails) {
+        const parsedDetails = JSON.parse(storedDetails);
+        // Format timestamp
+        if (!parsedDetails.timestamp) {
+           parsedDetails.timestamp = format(new Date(), 'PPP p');
+        } else {
+           try { parsedDetails.timestamp = format(new Date(parsedDetails.timestamp), 'PPP p'); } catch {}
+        }
+        setOrderDetails(parsedDetails as OrderDetails);
+        console.log("Loaded order details from localStorage:", parsedDetails);
           if (parsedDetails) {
             setOrderedProduct(parsedDetails as Product);
           }
           detailsFound = true;
-        } else {
-          console.warn("Could not find order details in localStorage for", orderId);
+      } else {
+        console.warn("Could not find order details in localStorage for", orderId);
         }
       } catch (e) {
         console.error("Error loading order details:", e);
@@ -417,16 +417,16 @@ const OrderConfirmation = () => {
                   </div>
               )}
             </div>
-            
+          
             {isSuccess && shopTelegramHandle && (
               <div className="mt-4 flex justify-center">
-                <Button 
-                  variant="default"
-                  onClick={() => window.open(telegramLink, "_blank")}
-                >
-                  <Send className="mr-2 h-4 w-4" />
-                  Contact Seller
-                </Button>
+              <Button 
+                variant="default"
+                onClick={() => window.open(telegramLink, "_blank")}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                Contact Seller
+              </Button>
               </div>
             )}
           </CardContent>
@@ -477,11 +477,11 @@ const OrderConfirmation = () => {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button asChild variant="link" size="sm">
-                    <a href={yodlTxUrl} target="_blank" rel="noopener noreferrer">
-                      View on yodl.me <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </Button>
+                 <Button asChild variant="link" size="sm">
+                   <a href={yodlTxUrl} target="_blank" rel="noopener noreferrer">
+                     View on yodl.me <ExternalLink className="ml-1 h-3 w-3" />
+                   </a>
+                 </Button>
                 </div>
               </CardContent>
             </Card>

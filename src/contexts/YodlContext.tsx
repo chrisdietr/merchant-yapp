@@ -75,11 +75,11 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
       console.log('Payment detected in URL:', urlPaymentResult);
       
       const orderId = (urlPaymentResult as any).memo || '';
-      
+        
       if (orderId) {
         // Payment was successful via redirect
         console.log('Payment successful (redirect):', urlPaymentResult);
-        
+          
         // Store payment details
         try {
           localStorage.setItem(`payment_${orderId}`, JSON.stringify({
@@ -89,29 +89,29 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
           
           // Broadcast successful payment message
           const message = {
-            type: 'payment_complete',
+              type: 'payment_complete', 
             txHash: urlPaymentResult.txHash,
             chainId: urlPaymentResult.chainId,
-            orderId
-          };
-          
+              orderId
+            };
+            
           // Broadcast locally
           window.postMessage(message, '*');
           
           // Broadcast to parent if in iframe
-          if (isInIframeValue && window.parent) {
+            if (isInIframeValue && window.parent) {
             window.parent.postMessage(message, '*');
-          }
-        } catch (e) {
+            }
+          } catch (e) {
           console.error("Error saving payment details:", e);
+          }
         }
-      }
       
       // Clean the URL to prevent duplicate processing on refresh
       cleanPaymentUrl();
     }
   }, [yodl, isInIframeValue]);
-  
+
   // Handle message events for payment completion
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
@@ -130,44 +130,44 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         const txHash = data.txHash;
         const chainId = data.chainId;
         const orderId = data.orderId || data.memo;
-        
+          
         if (!txHash || !orderId) {
           console.log("Message missing required transaction data", data);
           return;
         }
         
         console.log(`Processing payment result for order ${orderId}:`, { txHash, chainId });
-        
+            
         // Store in localStorage for persistence
         try {
-          localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
+            localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
         } catch (err) {
           console.error("Failed to save payment data to localStorage:", err);
         }
-        
+            
         // Create standardized message
-        const standardizedMessage = {
-          type: 'payment_complete',
-          txHash,
-          chainId,
-          orderId
-        };
-        
+              const standardizedMessage = {
+                type: 'payment_complete', 
+                txHash,
+                chainId,
+                orderId
+              };
+              
         // Broadcast standardized message
         try {
-          // Broadcast locally 
-          window.postMessage(standardizedMessage, '*');
-          
+              // Broadcast locally
+              window.postMessage(standardizedMessage, '*');
+              
           // Broadcast to parent if in iframe
-          if (isInIframeValue && window.parent) {
-            window.parent.postMessage(standardizedMessage, '*');
-          }
-        } catch (e) {
+              if (isInIframeValue && window.parent) {
+                 window.parent.postMessage(standardizedMessage, '*');
+              }
+            } catch (e) {
           console.error("Error broadcasting message:", e);
-        }
+      }
       }
     };
-    
+
     // Add event listener
     window.addEventListener('message', handleMessage);
     
@@ -228,7 +228,7 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
       } catch (e) {
         console.warn('Could not save order data to localStorage', e);
       }
-      
+            
       if (isInIframeValue) {
         console.log(`Handling iframe payment for ${recipientIdentifier}`);
       }
@@ -254,20 +254,20 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
 
         // Store in localStorage
         localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
-        
+
         // Broadcast standardized message
         const message = {
-          type: 'payment_complete', 
-          txHash,
-          chainId,
-          orderId
-        };
-        
+            type: 'payment_complete', 
+            txHash,
+            chainId,
+            orderId
+          };
+          
         // Use try-catch in case of errors during postMessage
         try {
           // Broadcast locally
           window.postMessage(message, '*');
-          
+
           // Broadcast to parent if in iframe
           if (isInIframeValue && window.parent) {
             window.parent.postMessage(message, '*');
@@ -295,11 +295,11 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
   };
 
   const contextValue = {
-    yodl,
-    createPayment,
-    parsePaymentFromUrl,
-    isInIframe: isInIframeValue,
-    merchantAddress,
+      yodl, 
+      createPayment,
+      parsePaymentFromUrl,
+      isInIframe: isInIframeValue,
+      merchantAddress,
     merchantEns,
   };
 

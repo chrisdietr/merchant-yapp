@@ -50,26 +50,26 @@ const ProductCard = ({
   const isAvailable = inStock === true || inStock === "infinite";
 
   return (
-    <Card className="w-full max-w-sm overflow-hidden transition-all duration-200 hover:shadow-lg bg-card dark:bg-card/80 flex flex-col">
+    <Card className="w-full max-w-full overflow-hidden transition-all duration-200 hover:shadow-lg bg-card dark:bg-card/80 flex flex-col">
       <div className="flex-grow">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 px-4 pt-4 sm:px-6 sm:pt-6">
           <div className="flex justify-between items-center">
-            <CardTitle className="text-xl font-bold text-black dark:text-white">{name}</CardTitle>
-            <div className="text-4xl">{emoji}</div>
+            <CardTitle className="text-lg sm:text-xl font-bold text-black dark:text-white">{name}</CardTitle>
+            <div className="text-3xl sm:text-4xl">{emoji}</div>
           </div>
-          <CardDescription className="text-sm text-muted-foreground dark:text-gray-400 min-h-[2.5rem]">
+          <CardDescription className="text-sm text-muted-foreground dark:text-gray-400 min-h-[2rem] sm:min-h-[2.5rem]">
             {description}
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           <div className="flex justify-between items-center">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">
+            <div className="text-xl sm:text-2xl font-bold text-green-600 dark:text-green-400">
               {price} {currency}
             </div>
           </div>
         </CardContent>
       </div>
-      <CardFooter>
+      <CardFooter className="px-4 pb-4 sm:px-6 sm:pb-6">
         <Button
           onClick={handleCheckout}
           className={`w-full ${isWalletConnected && isAvailable ? 'bg-purple-700 hover:bg-purple-800 dark:bg-purple-600 dark:hover:bg-purple-700 text-white' : ''}`}
