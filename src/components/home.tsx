@@ -250,28 +250,50 @@ const Home = () => {
         </div>
       </header>
 
-      <main className="flex-grow">
-        <section>
-          <h2 className="text-2xl font-bold mb-6 text-center sm:text-left">Products</h2>
+      <main className="flex-grow pt-8 pb-16">
+        <h2 className="text-2xl font-bold text-center mb-8">Products</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+          {shopConfig.products.map((product) => (
+            <ProductCard
+              key={product.id}
+              id={product.id || `prod_${Math.random()}`}
+              name={product.name || 'Unknown Product'}
+              description={product.description || ''}
+              price={product.price || 0}
+              currency={product.currency || 'USD'}
+              emoji={product.emoji || '🛒'}
+              inStock={product.inStock !== undefined ? product.inStock : true}
+              onCheckout={handleOpenCheckoutModal}
+              isWalletConnected={isConnected}
+              onConnectWallet={handleConnectWallet}
+            />
+          ))}
+        </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 product-grid">
-            {shopConfig.products.map((product) => (
-              <ProductCard
-                key={product.id}
-                id={product.id}
-                name={product.name}
-                description={product.description}
-                price={product.price}
-                currency={product.currency}
-                emoji={product.emoji}
-                inStock={product.inStock}
-                onCheckout={handleOpenCheckoutModal}
-                isWalletConnected={isConnected}
-                onConnectWallet={handleConnectWallet}
-              />
-            ))}
+        {/* Section for Connect Wallet Prompt - MOVED HERE */}
+        {!isConnected && (
+          <div className="mt-12 text-center p-8 bg-card border rounded-lg shadow-sm max-w-md mx-auto flex flex-col items-center">
+            <h2 className="text-2xl font-semibold mb-3">Welcome to {shopConfig.shops[0].name}</h2>
+            <p className="text-muted-foreground mb-6">Connect your wallet to view your purchase history or make a purchase.</p>
+            <ConnectButton 
+              label="Connect Wallet"
+              showBalance={false} 
+              chainStatus="none"
+            />
           </div>
-        </section>
+        )}
+
+        {/* Section for Purchase History (conditional based on connection and admin status) */} 
+        {isConnected && !isAdmin && (
+          <div className="mt-12">
+            <PurchaseHistory />
+          </div>
+        )}
+        {isConnected && isAdmin && (
+          <div className="mt-12">
+            <AdminTransactionHistory />
+          </div>
+        )}
       </main>
 
       {selectedProduct && (
@@ -280,28 +302,6 @@ const Home = () => {
           onClose={handleCloseCheckoutModal}
           product={selectedProduct}
         />
-      )}
-
-      {!isConnected && (
-        <div className="max-w-2xl mx-auto mt-8">
-          <h2 className="text-2xl font-bold mb-4">Welcome to Merchant Yapp</h2>
-          <p className="mb-4">Connect your wallet to view your purchase history</p>
-          <Button onClick={openConnectModal}>Connect Wallet</Button>
-        </div>
-      )}
-
-      {isConnected && (
-        <div className="max-w-5xl mx-auto mt-12">
-          {/* Only show Purchase History if NOT admin */}
-          {!isAdmin && isConnected && <PurchaseHistory />}
-        </div>
-      )}
-
-      {/* Admin Transaction History (Conditionally Rendered) */}
-      {isAdmin && (
-        <div className="w-full max-w-7xl mx-auto mt-12 mb-12">
-          <AdminTransactionHistory />
-        </div>
       )}
     </div>
   );

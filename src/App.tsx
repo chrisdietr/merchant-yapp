@@ -16,6 +16,9 @@ const chains = [mainnet, polygon, optimism, arbitrum, base, gnosis] as const;
 const { connectors } = getDefaultWallets({
   appName: 'Merchant Yapp',
   projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
+  appUrl: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5175',
+  appIcon: typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png',
+  appDescription: 'Demo merchant application using Yodl Pay',
 });
 
 const wagmiConfig = createConfig({

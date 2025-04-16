@@ -11,9 +11,9 @@ TempoDevtools.init();
 const basename = import.meta.env.BASE_URL;
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
-  <React.StrictMode>
+  // <React.StrictMode> // Temporarily commented out to prevent double initialization warnings in dev
     <BrowserRouter basename={basename}>
       <App />
     </BrowserRouter>
-  </React.StrictMode>,
+  // </React.StrictMode>,
 );

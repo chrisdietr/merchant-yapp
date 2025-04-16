@@ -15,6 +15,7 @@ interface Payment {
   amount: number;
   currency: string;
   blockTimestamp?: string;
+  senderAddress?: string;
 }
 
 const PurchaseHistory = () => {
@@ -28,6 +29,8 @@ const PurchaseHistory = () => {
   
   // Check if debug mode is enabled via URL parameter
   const isDebugMode = window.location.search.includes('debug=true');
+  // Check if connected user is the admin
+  const isAdmin = address?.toLowerCase() === merchantAddress?.toLowerCase();
 
   // Helper function to add debug logs without triggering renders
   const addDebugLog = (message: string) => {
@@ -44,8 +47,10 @@ const PurchaseHistory = () => {
 
   useEffect(() => {
     const fetchPayments = async () => {
-      if (!address) {
+      // Only fetch if user is connected and NOT admin (admin uses AdminTransactionHistory)
+      if (!address || !merchantAddress || isAdmin) {
         setIsLoading(false);
+        setPayments([]); // Clear payments if not applicable
         return;
       }
 
@@ -54,12 +59,12 @@ const PurchaseHistory = () => {
         setError(null);
         debugLogsRef.current = [];
         
-        addDebugLog(`fetchPayments: Starting payment fetch for sender: ${address}`);
+        addDebugLog(`fetchPayments: Starting payment fetch for merchant: ${merchantAddress}, filtering for buyer: ${address}`);
         
-        // Get all payments for the connected address - ignore TS errors for now
-        // @ts-ignore - SDK type definitions don't match actual behavior
-        const response = await yodl.getPayments({ address });
-        addDebugLog(`fetchPayments: Got response with payment data`);
+        // Get payments received by the merchant address
+        // @ts-ignore - SDK type definitions might be incomplete
+        const response = await yodl.getPayments({ address: merchantAddress });
+        addDebugLog(`fetchPayments: Got response with payment data from merchant`);
         
         // Handle different response types
         let allPayments: any[] = [];
@@ -67,32 +72,40 @@ const PurchaseHistory = () => {
           allPayments = response;
           addDebugLog(`fetchPayments: Response is an array with ${allPayments.length} payments`);
         } else if (response && typeof response === 'object') {
-          // @ts-ignore - SDK type definitions don't match actual behavior
+          // @ts-ignore - SDK type definitions might be incomplete
           allPayments = response.payments || [];
           addDebugLog(`fetchPayments: Response is an object with ${allPayments.length} payments`);
         }
         
-        // Filter payments that have memos matching product names
+        // Filter payments:
+        // 1. Made by the currently connected address (buyer)
+        // 2. Have memos matching product names
         const productNames = shopConfig.products.map(p => p.name.toLowerCase());
-        
-        // Track matches for debug only
         let productMatches = 0;
+        let buyerMatches = 0;
         
-        // @ts-ignore - SDK type definitions don't match actual behavior
+        // @ts-ignore - SDK type definitions might be incomplete
         const relevantPayments = allPayments
           .filter((paymentStatus: any) => {
-            // Skip if it's an error response
-            if ('error' in paymentStatus) return false;
+            // Skip if it's an error response or missing sender
+            if ('error' in paymentStatus || !paymentStatus.senderAddress) return false;
             
+            // Check 1: Is the sender the currently connected (non-admin) user?
+            const isCorrectBuyer = paymentStatus.senderAddress.toLowerCase() === address.toLowerCase();
+            if (!isCorrectBuyer) {
+              return false;
+            }
+            buyerMatches++; // Count matches for the correct buyer
+            
+            // Check 2: Does the memo include any product name?
             const memo = paymentStatus.memo?.toLowerCase() || '';
-            // Check if memo includes any product name
-            const isMatch = productNames.some(name => memo.includes(name));
+            const isProductMatch = productNames.some(name => memo.includes(name));
             
-            if (isMatch && isDebugMode) {
+            if (isProductMatch && isDebugMode) {
               productMatches++;
             }
             
-            return isMatch;
+            return isProductMatch; // Return true only if both buyer and product match
           })
           .map((paymentStatus: any) => {
             // Extract the payment data
@@ -100,20 +113,22 @@ const PurchaseHistory = () => {
               txHash: paymentStatus.txHash,
               chainId: paymentStatus.chainId,
               memo: paymentStatus.memo,
-              timestamp: paymentStatus.timestamp,
+              timestamp: paymentStatus.timestamp, // Initial timestamp if available
               amount: paymentStatus.amount,
-              currency: paymentStatus.currency
+              currency: paymentStatus.currency,
+              senderAddress: paymentStatus.senderAddress // Include sender address
             };
             
             return payment;
           });
         
         if (isDebugMode) {
-          addDebugLog(`fetchPayments: Found ${productMatches} product name matches in memos`);
-          addDebugLog(`fetchPayments: Found ${relevantPayments.length} relevant payments`);
+          addDebugLog(`fetchPayments: Found ${buyerMatches} payments sent by ${address}`);
+          addDebugLog(`fetchPayments: Found ${productMatches} product name matches within those`);
+          addDebugLog(`fetchPayments: Found ${relevantPayments.length} relevant payments for this user`);
         }
         
-        // Fetch additional details for each payment
+        // Fetch additional details (like blockTimestamp) for each relevant payment
         const paymentsWithDetails = await Promise.all(
           relevantPayments.map(async (payment) => {
             const details = await fetchTransactionDetails(payment.txHash, isDebugMode ? addDebugLog : undefined);
@@ -146,9 +161,14 @@ const PurchaseHistory = () => {
     };
 
     fetchPayments();
-  }, [address, yodl, isDebugMode]);
+  }, [address, yodl, merchantAddress, isAdmin, isDebugMode]); // Add merchantAddress and isAdmin to dependency array
 
   const shouldShowDebug = isDebugMode;
+
+  // Don't render this component if the admin is connected
+  if (isAdmin) {
+    return null;
+  }
 
   return (
     <Card className="w-full max-w-5xl mx-auto mt-8">

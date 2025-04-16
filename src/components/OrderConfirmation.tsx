@@ -17,10 +17,18 @@ import { shopConfig, Product } from '../config/config';
 import ThemeToggle from "./ThemeToggle";
 import { generateConfirmationUrl } from "@/utils/url";
 import useDeviceDetection from "../hooks/useMediaQuery";
+import { fetchTransactionDetails } from "../utils/dateUtils";
 
 interface PaymentResult {
   txHash?: string | null; 
   chainId?: number | undefined;
+}
+
+interface TransactionDetails {
+  payment?: {
+    memo?: string;
+    blockTimestamp?: string;
+  };
 }
 
 interface OrderDetails {
@@ -40,8 +48,10 @@ const OrderConfirmation = () => {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [orderedProduct, setOrderedProduct] = useState<Product | null>(null);
+  const [transactionDetails, setTransactionDetails] = useState<TransactionDetails | null>(null);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   
-  const orderId = searchParams.get("orderId");
+  const orderIdFromUrl = searchParams.get("orderId");
   const urlTxHash = searchParams.get("txHash");
   const urlChainId = searchParams.get("chainId");
 
@@ -63,13 +73,13 @@ const OrderConfirmation = () => {
 
   // Primary Effect: Detect Payment Completion and Load Data
   useEffect(() => {
-    if (!orderId) {
+    if (!orderIdFromUrl) {
       setError("Order ID is missing from URL.");
       setIsLoading(false);
       return;
     }
 
-    console.log(`Order Confirmation: Starting check for orderId: ${orderId}`);
+    console.log(`Order Confirmation: Starting check for orderId: ${orderIdFromUrl}`);
     setIsLoading(true); 
     setError(null);
     setWarning(null);
@@ -114,7 +124,7 @@ const OrderConfirmation = () => {
         detailsFound = true;
         
         // Store in localStorage for future visits
-        localStorage.setItem(`order_${orderId}`, JSON.stringify({
+        localStorage.setItem(`order_${orderIdFromUrl}`, JSON.stringify({
           ...urlOrderDetails,
           timestamp: productTimestamp || new Date().toISOString()
         }));
@@ -127,7 +137,7 @@ const OrderConfirmation = () => {
     if (!urlTxHash) {
       console.log("No txHash in URL, checking localStorage as fallback.");
       try {
-        const storedPaymentResult = localStorage.getItem(`payment_${orderId}`);
+        const storedPaymentResult = localStorage.getItem(`payment_${orderIdFromUrl}`);
         if (storedPaymentResult) {
           const parsedResult = JSON.parse(storedPaymentResult);
           if (parsedResult.txHash) {
@@ -145,7 +155,7 @@ const OrderConfirmation = () => {
       setPaymentResult(confirmedPayment);
       console.log("Payment considered CONFIRMED.", confirmedPayment);
       // Ensure it's stored locally even if confirmed via URL
-      localStorage.setItem(`payment_${orderId}`, JSON.stringify(confirmedPayment));
+      localStorage.setItem(`payment_${orderIdFromUrl}`, JSON.stringify(confirmedPayment));
       
       // Clean URL params after processing
       if (urlTxHash) {
@@ -160,7 +170,7 @@ const OrderConfirmation = () => {
     if (!detailsFound) {
       console.log("Order details not in URL, checking localStorage...");
     try {
-      const storedDetails = localStorage.getItem(orderId) || localStorage.getItem(`order_${orderId}`);
+      const storedDetails = localStorage.getItem(orderIdFromUrl) || localStorage.getItem(`order_${orderIdFromUrl}`);
       if (storedDetails) {
         const parsedDetails = JSON.parse(storedDetails);
         // Format timestamp
@@ -176,7 +186,7 @@ const OrderConfirmation = () => {
           }
           detailsFound = true;
       } else {
-        console.warn("Could not find order details in localStorage for", orderId);
+        console.warn("Could not find order details in localStorage for", orderIdFromUrl);
         }
       } catch (e) {
         console.error("Error loading order details:", e);
@@ -192,14 +202,39 @@ const OrderConfirmation = () => {
     setIsLoading(false);
     console.log("Order Confirmation checks complete.");
 
-  }, [orderId, urlTxHash, urlChainId, searchParams, setSearchParams]); // Re-run if key URL params change
+  }, [orderIdFromUrl, urlTxHash, urlChainId, searchParams, setSearchParams]);
+
+  // Effect to fetch full transaction details once txHash is confirmed
+  useEffect(() => {
+    const getDetails = async () => {
+      if (paymentResult?.txHash) {
+        console.log(`Fetching transaction details for txHash: ${paymentResult.txHash}`);
+        setIsFetchingDetails(true);
+        try {
+          const details = await fetchTransactionDetails(paymentResult.txHash);
+          if (details) {
+            console.log("Fetched transaction details:", details);
+            setTransactionDetails(details);
+          } else {
+            console.warn("fetchTransactionDetails returned null or undefined");
+          } 
+        } catch (fetchErr: any) {
+          console.error("Error fetching transaction details:", fetchErr);
+        } finally {
+          setIsFetchingDetails(false);
+        }
+      }
+    };
+
+    getDetails();
+  }, [paymentResult?.txHash]);
 
   // Document title effect
   useEffect(() => {
     if (orderDetails) {
       document.title = `Order Confirmation - ${orderDetails.name}`;
-    } else if (orderId) {
-      document.title = `Order Status - ${orderId}`;
+    } else if (orderIdFromUrl) {
+      document.title = `Order Status - ${orderIdFromUrl}`;
     } else {
       document.title = "Order Status"; // Keep this for when no orderId
     }
@@ -208,7 +243,7 @@ const OrderConfirmation = () => {
     return () => {
       document.title = "Merchant Yapp"; 
     };
-  }, [orderDetails, orderId]);
+  }, [orderDetails, orderIdFromUrl]);
 
   // Render Loading State
   if (isLoading) {
@@ -239,10 +274,11 @@ const OrderConfirmation = () => {
 
   // Main Render Logic
   const isSuccess = paymentResult && paymentResult.txHash;
+  const displayMemo = transactionDetails?.payment?.memo || orderIdFromUrl;
 
-  // Modify QR Code generation to include txHash, chainId AND order details
+  // Modify QR Code generation to include the displayed memo/orderId
   const generateQrUrl = () => {
-    const url = new URL(generateConfirmationUrl(orderId || ""));
+    const url = new URL(generateConfirmationUrl(displayMemo || ""));
     
     // Payment info
     if (paymentResult?.txHash) {
@@ -358,7 +394,7 @@ const OrderConfirmation = () => {
                 <h3 className="font-semibold text-center mb-2">Order Summary</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-2 text-sm">
                   <span className="text-muted-foreground">Order ID:</span>
-                  <span className="text-right break-all overflow-hidden overflow-ellipsis">{orderId || "N/A"}</span>
+                  <span className="text-right break-all overflow-hidden overflow-ellipsis">{displayMemo || "N/A"}</span>
                   
                   {orderDetails && (
                     <>
