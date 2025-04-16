@@ -61,6 +61,43 @@ function AppContent() {
         min-height: 500px; /* Ensure minimum height */
         background-color: white !important;
       }
+      
+      /* Mobile wallet UI fixes */
+      [data-rk] > div {
+        z-index: 99999 !important;
+        position: fixed !important;
+      }
+      
+      /* RainbowKit wallet connect button popover positioning */
+      [data-rk] div[data-rk-component="ConnectButtonRenderer"] > div {
+        transform: none !important;
+        position: fixed !important;
+        inset: auto !important;
+        right: 0 !important;
+        left: 0 !important;
+        top: auto !important;
+        bottom: 0 !important;
+        width: 100% !important;
+        max-width: 100% !important;
+        z-index: 2147483647 !important;
+        border-radius: 12px 12px 0 0 !important;
+        padding-bottom: env(safe-area-inset-bottom) !important;
+      }
+      
+      @media (min-width: 768px) {
+        /* Fix wallet UI on desktop */
+        [data-rk] div[data-rk-component="ConnectButtonRenderer"] > div {
+          transform: none !important;
+          position: absolute !important;
+          inset: auto !important;
+          right: 0 !important;
+          left: auto !important;
+          top: 100% !important;
+          bottom: auto !important;
+          width: auto !important;
+          border-radius: 12px !important;
+        }
+      }
     `;
     document.head.appendChild(style);
     
@@ -91,7 +128,11 @@ function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <WagmiConfig config={wagmiConfig}>
-          <RainbowKitProvider>
+          <RainbowKitProvider
+            modalSize="compact"
+            showRecentTransactions={true}
+            coolMode
+          >
             <YodlProvider>
               <AppContent />
             </YodlProvider>
