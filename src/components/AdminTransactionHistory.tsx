@@ -55,15 +55,20 @@ const AdminTransactionHistory = () => {
   useEffect(() => {
     if (!address) {
       setIsAuthenticated(false);
+      setShowAuthDialog(false);
       return;
     }
     
+    // Check if the user is already authenticated
     const isAuthed = isAdminAuthenticated(address);
     setIsAuthenticated(isAuthed);
     
     // If we're not authenticated and we're an admin, show the auth dialog
+    // But don't show it initially - let the user click the button
     if (!isAuthed && isAdmin) {
-      setShowAuthDialog(true);
+      console.log("Admin needs authentication");
+      // Don't auto-show the dialog - let the user click the authenticate button
+      setShowAuthDialog(false);
     }
   }, [address, isAdmin]);
   

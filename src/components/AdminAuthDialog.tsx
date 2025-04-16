@@ -13,6 +13,19 @@ interface AdminAuthDialogProps {
   onClose: () => void;
 }
 
+// Custom dialog content with higher z-index
+const HighZIndexDialogContent = React.forwardRef<
+  React.ElementRef<typeof DialogContent>,
+  React.ComponentPropsWithoutRef<typeof DialogContent>
+>((props, ref) => (
+  <DialogContent
+    ref={ref}
+    className="z-[100] sm:max-w-md"
+    {...props}
+  />
+));
+HighZIndexDialogContent.displayName = "HighZIndexDialogContent";
+
 const AdminAuthDialog: React.FC<AdminAuthDialogProps> = ({ isOpen, onSuccess, onClose }) => {
   const { address } = useAccount();
   const { signMessageAsync } = useSignMessage();
@@ -28,7 +41,7 @@ const AdminAuthDialog: React.FC<AdminAuthDialogProps> = ({ isOpen, onSuccess, on
   if (!isAdmin) {
     return (
       <Dialog open={isOpen} onOpenChange={() => onClose()}>
-        <DialogContent className="sm:max-w-md">
+        <HighZIndexDialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AlertCircle className="h-5 w-5 text-red-500" />
@@ -41,7 +54,7 @@ const AdminAuthDialog: React.FC<AdminAuthDialogProps> = ({ isOpen, onSuccess, on
           <div className="mt-4">
             <Button onClick={onClose} className="w-full">Close</Button>
           </div>
-        </DialogContent>
+        </HighZIndexDialogContent>
       </Dialog>
     );
   }
@@ -56,12 +69,14 @@ const AdminAuthDialog: React.FC<AdminAuthDialogProps> = ({ isOpen, onSuccess, on
       // Generate a nonce
       const nonce = generateNonce();
       
-      // Create the SIWE message
+      // Create the SIWE message with a simpler statement
       const message = createSiweMessage(
         address,
-        'Sign in as admin to access the transaction history and admin features.',
+        'Sign to verify you are the admin of this merchant store.',
         nonce
       );
+      
+      console.log("SIWE Message:", message); // For debugging
       
       // Request signature from the user
       const signature = await signMessageAsync({ 
@@ -71,13 +86,23 @@ const AdminAuthDialog: React.FC<AdminAuthDialogProps> = ({ isOpen, onSuccess, on
       
       if (signature) {
         // Signature verified in the wallet, so we can consider this authenticated
-        // In a production app with a backend, you'd verify this server-side too
         saveAdminAuth(address);
         onSuccess();
       }
     } catch (err: any) {
       console.error('Authentication error:', err);
-      setError(err.message || 'Failed to authenticate. Please try again.');
+      // Format error message for better user experience
+      let errorMsg = 'Failed to authenticate. Please try again.';
+      
+      if (err.message) {
+        if (err.message.includes('User rejected the request')) {
+          errorMsg = 'You declined to sign the message. Authentication is required to access admin features.';
+        } else if (err.message.includes('invalid')) {
+          errorMsg = 'There was an issue with the authentication message format. Please try again.';
+        }
+      }
+      
+      setError(errorMsg);
     } finally {
       setIsAuthenticating(false);
     }
@@ -85,7 +110,7 @@ const AdminAuthDialog: React.FC<AdminAuthDialogProps> = ({ isOpen, onSuccess, on
   
   return (
     <Dialog open={isOpen} onOpenChange={() => onClose()}>
-      <DialogContent className="sm:max-w-md">
+      <HighZIndexDialogContent>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShieldCheck className="h-5 w-5 text-primary" />
@@ -126,7 +151,7 @@ const AdminAuthDialog: React.FC<AdminAuthDialogProps> = ({ isOpen, onSuccess, on
             Cancel
           </Button>
         </div>
-      </DialogContent>
+      </HighZIndexDialogContent>
     </Dialog>
   );
 };

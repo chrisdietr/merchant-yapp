@@ -2,7 +2,8 @@ import { SiweMessage } from 'siwe';
 
 // Generate a random nonce for SIWE authentication
 export const generateNonce = (): string => {
-  return Math.floor(Math.random() * 1000000).toString();
+  // Return a larger, more random nonce
+  return Math.floor(Math.random() * 1000000000).toString();
 };
 
 // Create a SIWE message for the given address
@@ -14,14 +15,18 @@ export const createSiweMessage = (
   const domain = window.location.host;
   const origin = window.location.origin;
   
+  // Create a proper SIWE message with all required fields
   const message = new SiweMessage({
     domain,
     address,
     statement,
     uri: origin,
     version: '1',
-    chainId: 1, // Default to Ethereum mainnet, but this can be changed based on connected chain
-    nonce
+    chainId: 1,
+    nonce,
+    // Add these extra fields to ensure proper message format
+    issuedAt: new Date().toISOString(),
+    resources: [origin]
   });
   
   return message.prepareMessage();

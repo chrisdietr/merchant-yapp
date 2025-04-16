@@ -184,7 +184,7 @@ const CheckoutModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={`${isInIframe ? 'sm:max-w-sm' : 'sm:max-w-md'} w-[92%] sm:w-[90%] bg-background rounded-lg`}>
+      <DialogContent className={`${isInIframe ? 'sm:max-w-sm' : 'sm:max-w-md'} w-[92%] sm:w-[90%] bg-background rounded-lg`} style={{ zIndex: 1000 }}>
         <DialogHeader>
           <DialogTitle className={`${isInIframe ? 'text-xl' : 'text-lg sm:text-xl md:text-2xl'} font-bold flex items-center gap-2`}>
             <span>{product?.emoji}</span>
