@@ -215,7 +215,7 @@ const PurchaseHistory = () => {
                   <div className="flex items-center">
                     <ExternalLink className="h-4 w-4 mr-2" />
                     <a
-                      href={`https://tx.yodl.me/${payment.txHash}`}
+                      href={`https://yodl.me/tx/${payment.txHash}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary hover:underline truncate"

@@ -309,6 +309,7 @@ const OrderConfirmation = () => {
   // Log the final QR value
   console.log("Final QR Code Value:", receiptQrValue);
 
+  // Corrected URL prefix for yodlTxUrl
   const yodlTxUrl = isSuccess ? `https://yodl.me/tx/${paymentResult.txHash}` : '';
 
   // Construct pre-filled Telegram message
@@ -428,6 +429,7 @@ const OrderConfirmation = () => {
                       
                       <span className="text-muted-foreground">Transaction Hash:</span>
                       <Link 
+                        // Corrected URL prefix for the direct Link component
                         to={`https://yodl.me/tx/${paymentResult.txHash}`}
                         target="_blank"
                         rel="noopener noreferrer"

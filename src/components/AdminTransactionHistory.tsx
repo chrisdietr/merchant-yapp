@@ -279,17 +279,15 @@ const AdminTransactionHistory = () => {
                         <Tag className="h-4 w-4 mr-2 text-purple-600 dark:text-purple-500 opacity-90" />
                         <span className="truncate" title={payment.txHash}>Tx: {payment.txHash.substring(0, 6)}...{payment.txHash.substring(payment.txHash.length - 4)}</span>
                       </div>
-                      <div className="mt-1">
-                        <a
-                          href={`https://tx.yodl.me/${payment.txHash}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-primary hover:underline inline-flex items-center gap-1.5 text-sm font-medium"
-                        >
-                          View Receipt <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </div>
                     </div>
+                  </div>
+                  <div className="flex justify-end items-center">
+                    <a href={`https://yodl.me/tx/${payment.txHash}`}
+                      target="_blank" 
+                      rel="noopener noreferrer" 
+                      className="text-sm text-primary hover:underline flex items-center">
+                      View Receipt <ExternalLink className='h-3 w-3 ml-1'/>
+                    </a>
                   </div>
                 </div>
               ))}
