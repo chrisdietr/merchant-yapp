@@ -150,7 +150,7 @@
   font-size: 0.875rem;
 }
 
-/* Simple RainbowKit responsive adjustments */
+/* RainbowKit responsive adjustments */
 @media (max-width: 480px) {
   /* Ensure RainbowKit modals have proper z-index */
   [data-rk][role="dialog"] {
@@ -173,6 +173,52 @@
       right: 0 !important;
       bottom: 0 !important;
     }
+  }
+  
+  /* Reduce wallet modal white space */
+  [data-rk] [role="dialog"] {
+    padding: 12px !important;
+    max-height: 90vh !important;
+  }
+  
+  /* Make wallet list more compact */
+  [data-rk] [role="dialog"] > div {
+    gap: 8px !important;
+    padding-bottom: 12px !important;
+  }
+  
+  /* Reduce space between wallet options */
+  [data-rk] [role="dialog"] [data-rk-walletconnector-list] {
+    gap: 6px !important;
+  }
+  
+  /* Reduce text spacing */
+  [data-rk] [role="dialog"] h1 {
+    margin-bottom: 8px !important;
+    font-size: 18px !important;
+  }
+  
+  /* Make the explanatory text more compact */
+  [data-rk] [role="dialog"] p {
+    margin: 6px 0 !important;
+    line-height: 1.3 !important;
+    font-size: 0.9rem !important;
+  }
+  
+  /* Tighten up the buttons at bottom */
+  [data-rk] [role="dialog"] > div:last-child {
+    margin-top: 8px !important;
+    gap: 8px !important;
+  }
+
+  /* Make wallet buttons more compact */
+  [data-rk] [role="dialog"] button {
+    padding: 10px !important;
+  }
+
+  /* Reduce bottom padding of modal content */
+  [data-rk] [role="dialog"] > div:not(:last-child) {
+    padding-bottom: 0 !important;
   }
 }
 
