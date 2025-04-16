@@ -28,13 +28,14 @@ interface CheckoutModalProps {
   isOpen: boolean;
   onClose: () => void;
   product: Product | null;
-  onCheckout?: (product: Product, quantity: number) => Promise<void>;
+  onInitiateCheckout: (product: Product, buyerName: string) => Promise<void>;
 }
 
 const CheckoutModal = ({
   isOpen,
   onClose,
   product,
+  onInitiateCheckout,
 }: CheckoutModalProps) => {
   const navigate = useNavigate();
   const [paymentStatus, setPaymentStatus] = useState<
@@ -43,7 +44,8 @@ const CheckoutModal = ({
   const [progress, setProgress] = useState(0);
   const { createPayment, merchantAddress, merchantEns, isInIframe } = useYodl();
   const [orderId] = useState(() => `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`);
-  const [userName, setUserName] = useState("");
+  const [buyerName, setBuyerName] = useState("");
+  const [error, setError] = useState<string | null>(null);
   
   useEffect(() => {
     if (isOpen && product) {
@@ -69,53 +71,48 @@ const CheckoutModal = ({
   const handleStartPayment = async () => {
     if (!product) return;
     
-    // Check if name is provided (now required)
-    if (!userName.trim()) {
-      alert("Please enter your name to continue");
+    if (!buyerName.trim()) {
+      setError("Please enter your name (max 8 characters).");
+      return;
+    }
+    if (buyerName.length > 8) {
+      setError("Name cannot exceed 8 characters.");
       return;
     }
     
+    setError(null);
     setPaymentStatus("processing");
     setProgress(10);
 
-    // Create timestamp and format it efficiently
-    const timestamp = Date.now().toString().substring(6); // Use only last 7 digits of timestamp
+    const timestamp = Date.now().toString().substring(6);
     
-    // Format order ID to include product name, name and timestamp
-    // Ensure we keep it under 32 bytes by truncating longer parts
     const productNameShort = product.name.substring(0, 8).replace(/\s+/g, '_');
-    const userNameShort = userName.trim().substring(0, 8).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const userNameShort = buyerName.trim().substring(0, 8).replace(/[^a-zA-Z0-9_-]/g, '_');
     const formattedOrderId = `${productNameShort}_for_${userNameShort}_${timestamp}`;
     
-    // Ensure order ID is under 32 bytes (32 characters for ASCII)
     const finalOrderId = formattedOrderId.substring(0, 31);
 
     try {
       const confirmationUrl = generateConfirmationUrl(orderId);
       console.log(`Starting payment for order ${finalOrderId}${isInIframe ? ' (in iframe mode)' : ''}`);
 
-      // Set up a listener for payment completion messages
       const messageHandler = (event: MessageEvent) => {
         const data = event.data;
         
-        // Check for payment completion message
         if (data && typeof data === 'object' && data.type === 'payment_complete' && data.orderId === orderId) {
           console.log('Received payment completion message:', data);
           setProgress(100);
           setPaymentStatus("success");
           
-          // Navigate to confirmation screen
           setTimeout(() => {
             navigate(`/confirmation?orderId=${orderId}`);
             onClose();
           }, 1500);
           
-          // Remove listener once payment is detected
           window.removeEventListener('message', messageHandler);
         }
       };
       
-      // Add listener for payment completion
       window.addEventListener('message', messageHandler);
 
       const payment = await createPayment({
@@ -126,8 +123,8 @@ const CheckoutModal = ({
         metadata: {
           productId: product.id,
           productName: product.name,
-          orderId: orderId, // Keep original order ID in metadata
-          customerName: userName.trim(),
+          orderId: orderId,
+          customerName: buyerName.trim(),
           emoji: product.emoji,
           quantity: "1"
         },
@@ -148,8 +145,6 @@ const CheckoutModal = ({
         setProgress(100);
         setPaymentStatus("success");
         
-        // If we're in iframe mode, navigate to confirmation page
-        // For direct mode, the YodlContext will handle redirection
         if (isInIframe) {
           setTimeout(() => {
             navigate(`/confirmation?orderId=${orderId}`);
@@ -157,12 +152,10 @@ const CheckoutModal = ({
           }, 1500);
         }
       } else {
-        // In redirect flow (or payment not immediately confirmed)
         setPaymentStatus("processing");
         setProgress(50);
       }
       
-      // Clean up message listener if payment wasn't immediate
       return () => {
         window.removeEventListener('message', messageHandler);
       };
@@ -216,25 +209,26 @@ const CheckoutModal = ({
 
         <Separator className="my-3 sm:my-4" />
         
-        {/* Add user name input field */}
         <div className="mb-3 sm:mb-4">
-          <Label htmlFor="userName" className="text-sm font-medium">
-            Your Name <span className="text-red-500">*</span>
+          <Label htmlFor="buyerName" className="text-sm font-medium">
+            Your Name (for Memo) <span className="text-red-500">*</span>
           </Label>
           <div className="flex items-center mt-1 sm:mt-1.5">
             <User className="w-4 h-4 mr-2 text-muted-foreground" />
             <Input
-              id="userName"
-              placeholder="Enter your name"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
+              id="buyerName"
+              placeholder="Max 8 characters"
+              value={buyerName}
+              onChange={(e) => setBuyerName(e.target.value)}
               className="flex-1"
+              maxLength={8}
               required
             />
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
             Your name is required and will be included in the transaction memo for seller identification
           </p>
+          {error && <p className="text-xs text-red-500">{error}</p>}
         </div>
 
         {paymentStatus === "pending" && (

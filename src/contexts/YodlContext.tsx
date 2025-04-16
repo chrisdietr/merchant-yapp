@@ -12,6 +12,7 @@ interface YodlContextType {
     currency: string;
     description: string;
     orderId: string;
+    memo?: string;
     metadata?: Record<string, any>;
     redirectUrl?: string;
   }) => Promise<Payment | null>;
@@ -202,6 +203,7 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
     currency: string;
     description: string;
     orderId: string;
+    memo?: string;
     metadata?: Record<string, any>;
     redirectUrl?: string;
   }): Promise<Payment | null> => {
@@ -234,14 +236,16 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         addressOrEns: recipientIdentifier,
         amount: params.amount,
         currency: params.currency as FiatCurrency,
-        memo: params.orderId, // Use orderId as the memo for identification
+        memo: params.memo || params.orderId,
+        metadata: params.metadata,
         redirectUrl,
         flow
       };
       
       // Create the payment through Yodl
+      logDebug('Requesting payment with options:', paymentOptions);
       const payment = await yodl.requestPayment(paymentOptions);
-      logDebug('Payment created:', payment);
+      logDebug('Payment created/requested:', payment);
       
       return payment;
     } catch (error) {

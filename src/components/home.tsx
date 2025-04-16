@@ -38,43 +38,56 @@ const Home = () => {
   // Determine if admin mode is active
   const isAdmin = address && merchantAddress && address.toLowerCase() === merchantAddress.toLowerCase();
 
-  const handleBuyNow = async (product: Product) => {
-    console.log("[handleBuyNow] Clicked for:", product?.name);
-    if (!product) {
-      console.error("[handleBuyNow] Product data is missing.");
+  // NEW handler called by CheckoutModal
+  const handleInitiateCheckout = async (product: Product, buyerName: string) => {
+    console.log("[handleInitiateCheckout] Received:", { product, buyerName });
+    if (!product || !buyerName) {
+      console.error("[handleInitiateCheckout] Missing product or buyerName.");
+      toast({ title: "Error", description: "Missing required checkout information.", variant: "destructive" });
       return;
     }
-    
-    setIsProcessingPayment(product.id);
-    console.log(`[handleBuyNow] Set processing state for ${product.id}`);
 
-    const orderId = `order_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
-    console.log(`[handleBuyNow] Generated orderId: ${orderId}`);
+    setIsProcessingPayment(product.id);
+    handleCloseCheckoutModal(); // Close modal after getting info
+    console.log(`[handleInitiateCheckout] Set processing state for ${product.id}`);
+
+    // --- Memo and Order ID Generation ---
+    const orderId = Math.random().toString(16).substring(2, 10); // 8 hex chars for unique ID
+    const productNameShort = product.name?.substring(0, 10).replace(/\s+/g, '_') || 'product'; // Max 10 chars
+    const buyerNameClean = buyerName.substring(0, 8).replace(/[^a-zA-Z0-9_-]/g, ''); // Max 8 chars, simple clean
+    const memo = `${productNameShort}_for_${buyerNameClean}_${orderId}`.substring(0, 31); // Construct and truncate memo
+    console.log(`[handleInitiateCheckout] Generated orderId: ${orderId}`);
+    console.log(`[handleInitiateCheckout] Generated memo: ${memo} (Length: ${memo.length})`);
+
     const confirmationUrl = generateConfirmationUrl(orderId);
     
+    // Store order details using the generated orderId
     try {
-      console.log("[handleBuyNow] Attempting to save to localStorage...");
+      console.log("[handleInitiateCheckout] Attempting to save to localStorage...");
       localStorage.setItem(orderId, JSON.stringify({
         name: product.name,
         price: product.price,
         currency: product.currency,
         emoji: product.emoji,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        buyerName: buyerNameClean, // Optionally store cleaned buyer name
       }));
-      console.log(`[handleBuyNow] Stored details successfully for order ${orderId}`);
+      console.log(`[handleInitiateCheckout] Stored details successfully for order ${orderId}`);
     } catch (e) {
-      console.error("[handleBuyNow] Failed to save order details to localStorage", e);
-      setIsProcessingPayment(null); // Reset loading state on error
-      alert("Error preparing order. Please try again."); // User feedback
+      console.error("[handleInitiateCheckout] Failed to save order details to localStorage", e);
+      setIsProcessingPayment(null);
+      toast({ title: "Error", description: "Could not save order details. Please try again.", variant: "destructive" });
       return; 
     }
     
+    // --- Call createPayment --- 
     try {
-      console.log("[handleBuyNow] Attempting to call createPayment context function with:", {
+      console.log("[handleInitiateCheckout] Attempting to call createPayment context function with:", {
         amount: product.price,
         currency: product.currency,
         description: product.name,
-        orderId: orderId,
+        orderId: orderId, // Use generated short ID for tracking
+        memo: memo, // Use the constructed memo for on-chain data
         redirectUrl: confirmationUrl
       });
 
@@ -91,9 +104,9 @@ const Home = () => {
             }
           }, '*');
           
-          console.log("[handleBuyNow] Notified parent window about order start");
+          console.log("[handleInitiateCheckout] Notified parent window about order start");
         } catch (e) {
-          console.error("[handleBuyNow] Error notifying parent window:", e);
+          console.error("[handleInitiateCheckout] Error notifying parent window:", e);
         }
       }
 
@@ -104,7 +117,7 @@ const Home = () => {
           const iframes = document.querySelectorAll('iframe');
           iframes.forEach(iframe => {
             if (iframe.src && iframe.src.includes('yodl.me')) {
-              console.log("[handleBuyNow] Found Yodl iframe, ensuring it's usable on mobile/tablet:", iframe.src);
+              console.log("[handleInitiateCheckout] Found Yodl iframe, ensuring it's usable on mobile/tablet:", iframe.src);
               
               // Add necessary styles for mobile/tablet
               iframe.style.pointerEvents = 'auto';
@@ -130,7 +143,7 @@ const Home = () => {
             }
           });
         } catch (e) {
-          console.error("[handleBuyNow] Error handling iframes:", e);
+          console.error("[handleInitiateCheckout] Error handling iframes:", e);
         }
       }, 1000); // 1 second delay to allow iframe creation
 
@@ -138,27 +151,22 @@ const Home = () => {
         amount: product.price,
         currency: product.currency,
         description: product.name,
-        orderId: orderId,
+        orderId: orderId, // Pass the short ID for tracking
+        memo: memo, // Pass the constructed memo
         metadata: {
           productId: product.id,
           productName: product.name,
-          emoji: product.emoji
+          emoji: product.emoji,
+          buyerName: buyerNameClean, // Include buyer name in metadata too
         },
         redirectUrl: confirmationUrl
       });
       
-      console.log('[handleBuyNow] createPayment call finished:', paymentResult);
+      console.log('[handleInitiateCheckout] createPayment call finished:', paymentResult);
       
-      // If we get here and have a payment result with txHash, manually navigate to confirmation
+      // If immediate result, store payment with orderId
       if (paymentResult?.txHash) {
-        console.log('[handleBuyNow] Got immediate payment result with txHash:', paymentResult.txHash);
-        
-        // Store payment result in localStorage
-        localStorage.setItem(`payment_${orderId}`, JSON.stringify({
-          txHash: paymentResult.txHash,
-          chainId: paymentResult.chainId
-        }));
-        
+        localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash: paymentResult.txHash, chainId: paymentResult.chainId }));
         // In iframe mode, notify parent about completion
         if (isInIframe) {
           try {
@@ -168,30 +176,23 @@ const Home = () => {
               chainId: paymentResult.chainId,
               orderId: orderId
             }, '*');
-            console.log("[handleBuyNow] Notified parent window about payment completion");
+            console.log("[handleInitiateCheckout] Notified parent window about payment completion");
           } catch (e) {
-            console.error("[handleBuyNow] Error notifying parent window about completion:", e);
+            console.error("[handleInitiateCheckout] Error notifying parent window about completion:", e);
           }
         }
-
-        // Navigate to confirmation page
-        console.log('[handleBuyNow] Navigating to confirmation URL:', confirmationUrl);
-        window.location.href = confirmationUrl;
+        window.location.href = confirmationUrl; // Navigate
       } else {
-        console.log('[handleBuyNow] No immediate payment result, awaiting redirect or confirmation...');
-        // For redirect flow, the page will be redirected by the SDK
-        setIsProcessingPayment(null);
+        setIsProcessingPayment(null); // Await redirect or further action
       }
     } catch (error) {
-      console.error('[handleBuyNow] Call to createPayment failed:', error);
-      // Handle errors (e.g., user cancellation, timeout)
-      if (error && typeof error === 'object' && 'message' in error && error.message !== 'Payment was cancelled') {
-        alert(`Payment failed: ${error.message}`); // User feedback
-      }
-      // Clear stored data if payment failed early
-      localStorage.removeItem(orderId); // Remove order details
-      localStorage.removeItem(`payment_${orderId}`); // Ensure payment details are cleared too
-      setIsProcessingPayment(null); // Reset loading state on error
+      console.error('[handleInitiateCheckout] Call to createPayment failed:', error);
+       if (error && typeof error === 'object' && 'message' in error && error.message !== 'Payment was cancelled') {
+         toast({ title: "Payment Error", description: String(error.message), variant: "destructive" });
+       }
+      localStorage.removeItem(orderId);
+      localStorage.removeItem(`payment_${orderId}`);
+      setIsProcessingPayment(null);
     }
   };
 
@@ -263,7 +264,7 @@ const Home = () => {
               currency={product.currency || 'USD'}
               emoji={product.emoji || '🛒'}
               inStock={product.inStock !== undefined ? product.inStock : true}
-              onCheckout={handleOpenCheckoutModal}
+              onCheckout={() => handleOpenCheckoutModal(product)}
               isWalletConnected={isConnected}
               onConnectWallet={handleConnectWallet}
             />
@@ -301,6 +302,7 @@ const Home = () => {
           isOpen={isCheckoutModalOpen}
           onClose={handleCloseCheckoutModal}
           product={selectedProduct}
+          onInitiateCheckout={handleInitiateCheckout}
         />
       )}
     </div>
