@@ -17,6 +17,7 @@ A decentralized point-of-sale application with crypto payments built with React,
 - **Purchase History**: Displays transaction history for connected users.
 - **Admin Mode**: Automatically activated when the configured admin wallet connects.
 - **Admin Transaction History**: Shows all relevant sales received by the admin wallet, separate from the user's purchase history.
+- **SIWE Authentication**: Sign-In With Ethereum secures admin access, requiring cryptographic proof of wallet control.
 
 ## Payment Processing with Yodl
 
@@ -129,6 +130,7 @@ Make sure this is set correctly as all payments will be directed to this wallet!
 
 - **Admin Wallet**: Set your admin wallet address (and optional ENS) in `VITE_ADMIN_CONFIG`. This address receives payments.
 - **Admin Mode Activation**: If the connected wallet address matches the `VITE_ADMIN_CONFIG` address, Admin Mode is activated.
+- **Admin Authentication**: Secure admin access with SIWE (Sign-In With Ethereum), requiring cryptographic proof of wallet ownership.
 - **Conditional Views**: 
     - When Admin Mode is active, the `AdminTransactionHistory` component displays all relevant sales received by the admin.
     - When a regular user is connected, the `PurchaseHistory` component displays their own past purchases from this shop.

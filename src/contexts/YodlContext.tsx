@@ -59,6 +59,20 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
   const merchantAddress = merchantAdmin.address || "";
   const merchantEns = merchantAdmin.ens || "";
 
+  // Check if debug mode is enabled
+  const isDebugMode = window.location.search.includes('debug=true');
+
+  // Log handler that respects debug mode
+  const logDebug = (message: string, data?: any) => {
+    if (isDebugMode) {
+      if (data) {
+        console.log(`[YodlContext] ${message}`, data);
+      } else {
+        console.log(`[YodlContext] ${message}`);
+      }
+    }
+  };
+
   // Ensure we have an identifier
   useEffect(() => {
     if (!merchantAddress && !merchantEns) {
@@ -72,13 +86,13 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
     const urlPaymentResult = yodl.parsePaymentFromUrl();
 
     if (urlPaymentResult && urlPaymentResult.txHash) {
-      console.log('Payment detected in URL:', urlPaymentResult);
+      logDebug('Payment detected in URL:', urlPaymentResult);
       
       const orderId = (urlPaymentResult as any).memo || '';
         
       if (orderId) {
         // Payment was successful via redirect
-        console.log('Payment successful (redirect):', urlPaymentResult);
+        logDebug('Payment successful (redirect):', urlPaymentResult);
           
         // Store payment details
         try {
@@ -110,7 +124,7 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
       // Clean the URL to prevent duplicate processing on refresh
       cleanPaymentUrl();
     }
-  }, [yodl, isInIframeValue]);
+  }, [yodl, isInIframeValue, isDebugMode]);
 
   // Handle message events for payment completion
   useEffect(() => {
@@ -132,11 +146,11 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         const orderId = data.orderId || data.memo;
           
         if (!txHash || !orderId) {
-          console.log("Message missing required transaction data", data);
+          logDebug("Message missing required transaction data", data);
           return;
         }
         
-        console.log(`Processing payment result for order ${orderId}:`, { txHash, chainId });
+        logDebug(`Processing payment result for order ${orderId}:`, { txHash, chainId });
             
         // Store in localStorage for persistence
         try {
@@ -175,7 +189,7 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
     return () => {
       window.removeEventListener('message', handleMessage);
     };
-  }, [isInIframeValue]);
+  }, [isInIframeValue, isDebugMode]);
 
   // Simple wrapper to expose the SDK's URL parsing function
   const parsePaymentFromUrl = () => {
@@ -198,113 +212,56 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
       }
       
       // Determine redirectUrl - required when not in iframe mode
-      let redirectUrl = params.redirectUrl || generateConfirmationUrl(params.orderId);
-      if ((isMobile || isTouch) && !redirectUrl.startsWith('http')) {
-        redirectUrl = new URL(redirectUrl, window.location.origin).toString();
-      }
+      const redirectUrl = params.redirectUrl || generateConfirmationUrl(params.orderId);
       
-      console.log('Requesting payment with params:', { 
-        amount: params.amount, 
-        currency: params.currency, 
-        memo: params.orderId,
+      logDebug('Creating payment:', { 
+        ...params,
         redirectUrl,
-        isInIframe: isInIframeValue,
-        isMobile,
-        isTouch
+        recipient: recipientIdentifier 
       });
-      console.log('Using recipient:', recipientIdentifier);
       
-      // Pre-store order data
-      try {
-        const orderData = {
-          name: params.description,
-          price: params.amount,
-          currency: params.currency,
-          emoji: params.metadata?.emoji || '💰',
-          timestamp: new Date().toISOString(),
-        };
-        localStorage.setItem(`order_${params.orderId}`, JSON.stringify(orderData));
-        console.log(`Saved order data for ${params.orderId} before payment request`);
-      } catch (e) {
-        console.warn('Could not save order data to localStorage', e);
+      // Handle preferred flow based on device/context
+      let flow = 'iframe';
+      
+      // Use redirect flow for mobile/touch devices and when already in an iframe
+      if (isMobile || isTouch || isInIframeValue) {
+        flow = 'redirect';
+        logDebug(`Using redirect flow due to: mobile=${isMobile}, touch=${isTouch}, iframe=${isInIframeValue}`);
       }
-            
-      if (isInIframeValue) {
-        console.log(`Handling iframe payment for ${recipientIdentifier}`);
-      }
-            
-      // Request payment using SDK
-      const paymentResult = await yodl.requestPayment({
+      
+      // Create payment options
+      const paymentOptions = {
         addressOrEns: recipientIdentifier,
         amount: params.amount,
         currency: params.currency as FiatCurrency,
-        memo: params.orderId,
-        redirectUrl: redirectUrl,
-      });
-
-      console.log("Payment request completed with result:", paymentResult);
-
-      // If we got an immediate result with txHash, handle it
-      if (paymentResult?.txHash) {
-        console.log("Got direct payment result with txHash:", paymentResult.txHash);
-        
-        const txHash = paymentResult.txHash;
-        const chainId = paymentResult.chainId;
-        const orderId = params.orderId;
-
-        // Store in localStorage
-        localStorage.setItem(`payment_${orderId}`, JSON.stringify({ txHash, chainId }));
-
-        // Broadcast standardized message
-        const message = {
-            type: 'payment_complete', 
-            txHash,
-            chainId,
-            orderId
-          };
-          
-        // Use try-catch in case of errors during postMessage
-        try {
-          // Broadcast locally
-          window.postMessage(message, '*');
-
-          // Broadcast to parent if in iframe
-          if (isInIframeValue && window.parent) {
-            window.parent.postMessage(message, '*');
-          }
-        } catch (e) {
-          console.error("Error broadcasting payment message:", e);
-        }
-        
-        // For iframe mode, return the result without navigation
-        if (isInIframeValue) {
-          return paymentResult;
-        }
-        
-        // For non-iframe mode, redirect to confirmation page
-        setTimeout(() => {
-          window.location.href = redirectUrl;
-        }, 200);
-      }
-
-      return paymentResult;
+        memo: params.orderId, // Use orderId as the memo for identification
+        redirectUrl,
+        flow
+      };
+      
+      // Create the payment through Yodl
+      const payment = await yodl.requestPayment(paymentOptions);
+      logDebug('Payment created:', payment);
+      
+      return payment;
     } catch (error) {
       console.error('Error creating payment:', error);
-      throw error;
+      return null;
     }
   };
 
-  const contextValue = {
-      yodl, 
-      createPayment,
-      parsePaymentFromUrl,
-      isInIframe: isInIframeValue,
-      merchantAddress,
-    merchantEns,
-  };
-
+  // Provide the context to children
   return (
-    <YodlContext.Provider value={contextValue}>
+    <YodlContext.Provider
+      value={{
+        yodl,
+        createPayment,
+        isInIframe: isInIframeValue,
+        merchantAddress,
+        merchantEns,
+        parsePaymentFromUrl
+      }}
+    >
       {children}
     </YodlContext.Provider>
   );
