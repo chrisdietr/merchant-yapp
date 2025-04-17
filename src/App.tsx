@@ -10,6 +10,7 @@ import PaymentBridge from "./components/PaymentBridge";
 import routes from "tempo-routes";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { Analytics } from "@vercel/analytics/react";
 
 const chains = [mainnet, polygon, optimism, arbitrum, base, gnosis] as const;
 
@@ -95,6 +96,7 @@ function App() {
           <RainbowKitProvider>
             <YodlProvider>
               <AppContent />
+              <Analytics />
             </YodlProvider>
           </RainbowKitProvider>
         </WagmiConfig>

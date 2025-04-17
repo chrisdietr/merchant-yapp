@@ -230,7 +230,7 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
         flow = 'redirect';
         logDebug(`Using redirect flow due to: mobile=${isMobile}, touch=${isTouch}, iframe=${isInIframeValue}`);
       }
-      
+            
       // Create payment options
       const paymentOptions = {
         addressOrEns: recipientIdentifier,
@@ -258,11 +258,11 @@ export const YodlProvider: React.FC<YodlProviderProps> = ({ children }) => {
   return (
     <YodlContext.Provider
       value={{
-        yodl,
-        createPayment,
-        isInIframe: isInIframeValue,
-        merchantAddress,
-        merchantEns,
+      yodl, 
+      createPayment,
+      isInIframe: isInIframeValue,
+      merchantAddress,
+    merchantEns,
         parsePaymentFromUrl
       }}
     >

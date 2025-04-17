@@ -40,6 +40,7 @@
     "@radix-ui/react-toggle": "^1.0.3",
     "@radix-ui/react-tooltip": "^1.0.7",
     "@rainbow-me/rainbowkit": "^2.2.4",
+    "@vercel/analytics": "^1.5.0",
     "@yodlpay/yapp-sdk": "^1.7.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",

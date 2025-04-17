@@ -195,7 +195,7 @@ const PurchaseHistory = () => {
             {payments.map((payment) => (
               <div key={payment.txHash} className="border p-4 rounded-lg">
                 <div className="font-medium text-lg mb-2">
-                  {payment.memo || 'Unknown Product'}
+                    {payment.memo || 'Unknown Product'}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-y-3 gap-x-6 text-sm text-muted-foreground">
                   <div className="flex items-center">
@@ -209,19 +209,19 @@ const PurchaseHistory = () => {
                   <div className="flex items-center">
                     <Tag className="h-4 w-4 mr-2" />
                     <span>
-                      {payment.amount} {payment.currency}
+                    {payment.amount} {payment.currency}
                     </span>
                   </div>
                   <div className="flex items-center">
                     <ExternalLink className="h-4 w-4 mr-2" />
-                    <a
-                      href={`https://yodl.me/tx/${payment.txHash}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                <a
+                  href={`https://yodl.me/tx/${payment.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
                       className="text-primary hover:underline truncate"
-                    >
+                >
                       View Transaction
-                    </a>
+                </a>
                   </div>
                 </div>
               </div>

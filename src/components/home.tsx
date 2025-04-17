@@ -46,7 +46,7 @@ const Home = () => {
       toast({ title: "Error", description: "Missing required checkout information.", variant: "destructive" });
       return;
     }
-
+    
     setIsProcessingPayment(product.id);
     handleCloseCheckoutModal(); // Close modal after getting info
     console.log(`[handleInitiateCheckout] Set processing state for ${product.id}`);
@@ -187,7 +187,7 @@ const Home = () => {
       }
     } catch (error) {
       console.error('[handleInitiateCheckout] Call to createPayment failed:', error);
-       if (error && typeof error === 'object' && 'message' in error && error.message !== 'Payment was cancelled') {
+      if (error && typeof error === 'object' && 'message' in error && error.message !== 'Payment was cancelled') {
          toast({ title: "Payment Error", description: String(error.message), variant: "destructive" });
        }
       localStorage.removeItem(orderId);
@@ -254,9 +254,9 @@ const Home = () => {
       <main className="flex-grow pt-8 pb-16">
         <h2 className="text-2xl font-bold text-center mb-8">Products</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
-          {shopConfig.products.map((product) => (
-            <ProductCard
-              key={product.id}
+            {shopConfig.products.map((product) => (
+              <ProductCard
+                key={product.id}
               id={product.id || `prod_${Math.random()}`}
               name={product.name || 'Unknown Product'}
               description={product.description || ''}
@@ -265,11 +265,11 @@ const Home = () => {
               emoji={product.emoji || '🛒'}
               inStock={product.inStock !== undefined ? product.inStock : true}
               onCheckout={() => handleOpenCheckoutModal(product)}
-              isWalletConnected={isConnected}
-              onConnectWallet={handleConnectWallet}
-            />
-          ))}
-        </div>
+                isWalletConnected={isConnected}
+                onConnectWallet={handleConnectWallet}
+              />
+            ))}
+          </div>
 
         {/* Section for Connect Wallet Prompt - MOVED HERE */}
         {!isConnected && (
