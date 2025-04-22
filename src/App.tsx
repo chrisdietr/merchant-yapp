@@ -24,23 +24,22 @@ const chains = [mainnet, polygon, optimism, arbitrum, base, gnosis] as const;
 const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
 const config = getDefaultConfig({
-  appName: 'Merchant Yapp',
-  projectId,
-  chains,
+  appName: "Merchant Yapp",
+  projectId: projectId,
+  chains: [mainnet],
+  ssr: true,
   wallets: [
     {
-      groupName: 'Recommended',
-      wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet, phantomWallet, rabbyWallet]
-    }
+      groupName: "Recommended",
+      wallets: [
+        coinbaseWallet,
+        metaMaskWallet,
+        phantomWallet,
+        rabbyWallet,
+        walletConnectWallet,
+      ],
+    },
   ],
-  transports: {
-    [mainnet.id]: http(),
-    [polygon.id]: http(),
-    [optimism.id]: http(),
-    [arbitrum.id]: http(),
-    [base.id]: http(),
-    [gnosis.id]: http(),
-  },
 });
 
 const queryClient = new QueryClient();
