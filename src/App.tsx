@@ -1,8 +1,15 @@
 import { Suspense, useEffect } from "react";
 import { useRoutes, Routes, Route } from "react-router-dom";
-import { RainbowKitProvider, getDefaultWallets } from '@rainbow-me/rainbowkit';
+import { RainbowKitProvider, getDefaultConfig } from '@rainbow-me/rainbowkit';
 import { createConfig, http, WagmiConfig } from 'wagmi';
 import { mainnet, polygon, optimism, arbitrum, base, gnosis } from 'wagmi/chains';
+import { 
+  metaMaskWallet,
+  coinbaseWallet,
+  walletConnectWallet,
+  phantomWallet,
+  rabbyWallet
+} from '@rainbow-me/rainbowkit/wallets';
 import { YodlProvider, useYodl } from './contexts/YodlContext';
 import Home from "./components/home";
 import OrderConfirmation from "./components/OrderConfirmation";
@@ -14,17 +21,18 @@ import { Analytics } from "@vercel/analytics/react";
 
 const chains = [mainnet, polygon, optimism, arbitrum, base, gnosis] as const;
 
-const { connectors } = getDefaultWallets({
-  appName: 'Merchant Yapp',
-  projectId: import.meta.env.VITE_WALLETCONNECT_PROJECT_ID,
-  appUrl: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5175',
-  appIcon: typeof window !== 'undefined' ? `${window.location.origin}/logo.png` : '/logo.png',
-  appDescription: 'Demo merchant application using Yodl Pay',
-});
+const projectId = import.meta.env.VITE_WALLETCONNECT_PROJECT_ID;
 
-const wagmiConfig = createConfig({
+const config = getDefaultConfig({
+  appName: 'Merchant Yapp',
+  projectId,
   chains,
-  connectors,
+  wallets: [
+    {
+      groupName: 'Recommended',
+      wallets: [metaMaskWallet, coinbaseWallet, walletConnectWallet, phantomWallet, rabbyWallet]
+    }
+  ],
   transports: {
     [mainnet.id]: http(),
     [polygon.id]: http(),
@@ -92,7 +100,7 @@ function App() {
   return (
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
-        <WagmiConfig config={wagmiConfig}>
+        <WagmiConfig config={config}>
           <RainbowKitProvider>
             <YodlProvider>
               <AppContent />
